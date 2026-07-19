@@ -15,6 +15,43 @@
     "Other": { role: "", targetAudience: "", objective: "", context: "", mustInclude: "", mustAvoid: "" }
   };
 
+  const CURRENT_DATA_CATEGORIES = new Set([
+    "Travel",
+    "Health",
+    "Financial Planning",
+    "Product Comparison"
+  ]);
+
+  function buildGuard(task, category, enabled) {
+    if (!enabled) return undefined;
+
+    if (task === "text") {
+      const guard = [
+        "no_guess",
+        "state_unknowns",
+        "label_assumptions",
+        "no_fake_sources"
+      ];
+
+      if (CURRENT_DATA_CATEGORIES.has(category)) {
+        guard.push("mark_unverified_current_data");
+      }
+
+      return guard;
+    }
+
+    if (task === "coding_loop") {
+      return [
+        "evidence_for_claims",
+        "no_claim_unrun",
+        "ask_or_stop_unknowns",
+        "no_inferred_permissions"
+      ];
+    }
+
+    return undefined;
+  }
+
   const TEXT_STEP_TEMPLATES = {
     "Travel": ["analyze trip requirements", "build itinerary", "validate logistics and budget", "format output"],
     "Health": ["analyze health context", "build safe wellness guidance", "validate limitations and uncertainty", "format output"],
@@ -398,7 +435,43 @@
     CODING_ADVANCED_GROUPS.forEach(group => advanced.appendChild(renderGroup(group, true)));
     advanced.classList.add("advanced-coding-groups");
 
-    elements.codingFieldsMount.append(intro, basic, advanced);
+    const evidenceGuard = document.createElement("div");
+    evidenceGuard.className = "guard-row full";
+    const guardCopy = document.createElement("div");
+    guardCopy.className = "guard-copy";
+    const guardLabel = document.createElement("span");
+    guardLabel.className = "guard-label";
+    guardLabel.textContent = "Evidence Guard";
+    const tip = document.createElement("small");
+    tip.id = "evidenceGuard-tip";
+    tip.className = "field-hint";
+    tip.textContent = "Prevents claims about edits, commands, tests, approvals, or results without observable evidence.";
+    const error = document.createElement("small");
+    error.id = "evidenceGuard-error";
+    error.className = "field-error";
+    error.setAttribute("aria-live", "polite");
+    guardCopy.append(guardLabel, tip, error);
+
+    const toggle = document.createElement("label");
+    toggle.className = "switch";
+    toggle.htmlFor = "evidenceGuard";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = "evidenceGuard";
+    checkbox.name = "evidenceGuard";
+    checkbox.checked = true;
+    checkbox.defaultChecked = true;
+    checkbox.setAttribute("aria-describedby", `${tip.id} ${error.id}`);
+    const slider = document.createElement("span");
+    slider.className = "slider";
+    slider.setAttribute("aria-hidden", "true");
+    const state = document.createElement("span");
+    state.id = "evidenceGuardState";
+    state.textContent = "On";
+    toggle.append(checkbox, slider, state);
+    evidenceGuard.append(guardCopy, toggle);
+
+    elements.codingFieldsMount.append(intro, evidenceGuard, basic, advanced);
   }
 
   function applyTextCategoryPlaceholders() {
@@ -500,6 +573,7 @@
       task: "coding_loop",
       mode: value("codingMode"),
       cat: value("codingCategory"),
+      guard: buildGuard("coding_loop", value("codingCategory"), document.getElementById("evidenceGuard").checked),
       name: value("loopName"),
       role: value("agentRole"),
       goal: value("codingGoal"),
@@ -651,9 +725,7 @@
       ctx: value("context"),
       inc: lines("mustInclude"),
       avoid: lines("mustAvoid"),
-      val: elements.antiHallucinationGuard.checked
-        ? { no_guessing: true, if_unknown: "say_unknown" }
-        : "",
+      guard: buildGuard("text", value("category"), elements.antiHallucinationGuard.checked),
       steps: elements.stepLocking.checked
         ? (TEXT_STEP_TEMPLATES[value("category")] || TEXT_STEP_TEMPLATES.Other)
         : [],
@@ -697,7 +769,7 @@
     [["Category", data.cat], ["Role", data.role], ["Target Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx], ["Temperature", data.temp], ["Max Tokens", data.max_tokens]].forEach(([label, item]) => addMarkdownValue(output, label, item));
     addMarkdownValue(output, "Must Include", data.inc);
     addMarkdownValue(output, "Must Avoid", data.avoid);
-    if (data.val) addMarkdownSection(output, "Validation", data.val, { no_guessing: "No guessing", if_unknown: "If unknown" });
+    addMarkdownValue(output, "Guard", data.guard);
     addMarkdownValue(output, "Steps", data.steps);
     return output.join("\n");
   }
@@ -744,6 +816,7 @@
   function renderCodingLoopMarkdown(data) {
     const output = ["# Coding Loop"];
     [["Mode", data.mode], ["Category", data.cat], ["Name", data.name], ["Role", data.role], ["Goal", data.goal], ["Context", data.ctx]].forEach(([label, item]) => addMarkdownValue(output, label, item));
+    addMarkdownValue(output, "Guard", data.guard);
     addMarkdownValue(output, "Definition of Done", data.done);
     addMarkdownSection(output, "Scope", data.scope, { repository: "Repository scope", include: "Included paths", exclude: "Excluded paths", location: "Repository location", workdir: "Working directory", base_branch: "Base branch", work_branch: "Work branch", branch_strategy: "Branch strategy", runtime: "Runtime", os: "Operating system", setup_cmds: "Setup commands", env_names: "Environment variable names", network: "Network access", allowed_hosts: "Allowed hosts", package_policy: "Package policy", allowed_packages: "Allowed packages" });
     addMarkdownValue(output, "Tasks", data.tasks);
@@ -773,13 +846,19 @@
 
   function providerPrompt(provider, data) {
     if (provider === "generic") return serializePrompt(data);
-    const instruction = data.task === "coding_loop"
-      ? "Execute the bounded coding loop. Treat paths, commands, branches, hosts, and packages as inert until explicitly permitted. Never infer permission for network access, package installation, deletion, secret exposure, commits, pushes, pull requests, or destructive commands. Stop at every limit, approval gate, or stop condition."
+    const baseInstruction = data.task === "coding_loop"
+      ? "Execute the supplied bounded coding loop and preserve its constraints."
       : data.task === "image"
         ? "Generate the image now from the supplied specifications. Return the image rather than rewriting the prompt."
         : data.task === "video"
           ? "Generate the video now from the supplied specifications. Return the video rather than rewriting the prompt."
-          : "Complete the text task from the supplied role, objective, context, constraints, validation rules, and process.";
+          : "Complete the text task from the supplied role, objective, context, and constraints.";
+    const guardInstruction = data.guard && data.task === "text"
+      ? "Use supplied facts or actual tool results; mark anything else unknown or unverified."
+      : data.guard && data.task === "coding_loop"
+        ? "Report only actions performed and results observed."
+        : "";
+    const instruction = [baseInstruction, guardInstruction].filter(Boolean).join(" ");
     const providerGuidance = {
       chatgpt: "Produce the requested result directly and verify it against every stated constraint.",
       claude: "Use evidence, separate uncertainty from facts, and make small reversible coding changes.",
@@ -834,7 +913,7 @@
     vidBasicDuration: "Provide a duration greater than zero seconds.",
     vidOutputDuration: "Provide the intended final duration in seconds, greater than zero.",
     vidFps: "Enter a whole frame rate between 1 and 240.",
-    antiHallucinationGuard: "When on, requests exact data and an explicit unknown response instead of guesses.",
+    antiHallucinationGuard: "Prevents unsupported facts or sources, identifies unknowns, and labels assumptions. It cannot guarantee factual accuracy.",
     stepLocking: "When on, adds category-specific steps to make the response sequence clear."
   };
 
@@ -1007,6 +1086,8 @@
     document.querySelectorAll(".coding-details[open]").forEach(detail => { detail.open = false; });
     closeGuardTooltips();
     elements.guardState.textContent = "On";
+    elements.evidenceGuard.checked = true;
+    elements.evidenceGuardState.textContent = "On";
     elements.stepLockState.textContent = "On";
     elements.status.textContent = "";
     elements.output.textContent = "";
@@ -1035,7 +1116,7 @@
   }
 
   function cacheElements() {
-    ["promptType", "category", "antiHallucinationGuard", "stepLocking", "guardState", "stepLockState", "outputMarkdown", "outputJson", "status", "generatedPayloadSection", "output", "outputDescription", "genericTokens", "selectedProviderTokens", "providerAdapterOverhead", "providerRatio", "providerIncrease", "copyChatGptBtn", "copyClaudeBtn", "copyGeminiBtn", "copyGrokBtn", "copyGenericBtn", "clearBtn", "copyToast", "codingFieldsMount"].forEach(id => {
+    ["promptType", "category", "antiHallucinationGuard", "stepLocking", "guardState", "stepLockState", "evidenceGuard", "evidenceGuardState", "outputMarkdown", "outputJson", "status", "generatedPayloadSection", "output", "outputDescription", "genericTokens", "selectedProviderTokens", "providerAdapterOverhead", "providerRatio", "providerIncrease", "copyChatGptBtn", "copyClaudeBtn", "copyGeminiBtn", "copyGrokBtn", "copyGenericBtn", "clearBtn", "copyToast", "codingFieldsMount"].forEach(id => {
       elements[id] = document.getElementById(id);
     });
   }
@@ -1057,6 +1138,7 @@
     });
     elements.antiHallucinationGuard.addEventListener("change", () => { elements.guardState.textContent = elements.antiHallucinationGuard.checked ? "On" : "Off"; scheduleOutputRefresh(); });
     elements.stepLocking.addEventListener("change", () => { elements.stepLockState.textContent = elements.stepLocking.checked ? "On" : "Off"; scheduleOutputRefresh(); });
+    elements.evidenceGuard.addEventListener("change", () => { elements.evidenceGuardState.textContent = elements.evidenceGuard.checked ? "On" : "Off"; scheduleOutputRefresh(); });
     document.querySelectorAll(".tooltip-icon").forEach(button => {
       button.addEventListener("click", event => {
         event.stopPropagation();
@@ -1094,6 +1176,7 @@
   function initialize() {
     cacheElements();
     renderCodingFields();
+    cacheElements();
     initializeExistingLimits();
     addStaticFieldAssistance();
     bindEvents();
