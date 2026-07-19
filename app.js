@@ -514,7 +514,7 @@
       text: { chatgpt: "Copy for ChatGPT", claude: "Copy for Claude", gemini: "Copy for Gemini", grok: "Copy for Grok", generic: "Copy Generic" },
       image: { chatgpt: "Copy for ChatGPT Images", gemini: "Copy for Gemini Image", grok: "Copy for Grok Image", generic: "Copy Generic Image" },
       video: { gemini: "Copy for Gemini Video", grok: "Copy for Grok Video", generic: "Copy Generic Video" },
-      coding: { chatgpt: "Copy for Codex", claude: "Copy for Claude Code", gemini: "Copy for Gemini Coding", grok: "Copy for Grok", generic: "Copy Generic Loop" }
+      coding: { chatgpt: "Copy for Codex", claude: "Copy for Claude Code", gemini: "Copy for Google Antigravity", grok: "Copy for Grok Build", generic: "Copy Generic Loop" }
     };
     const buttons = { chatgpt: elements.copyChatGptBtn, claude: elements.copyClaudeBtn, gemini: elements.copyGeminiBtn, grok: elements.copyGrokBtn, generic: elements.copyGenericBtn };
     Object.entries(buttons).forEach(([provider, button]) => {
