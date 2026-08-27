@@ -37,19 +37,57 @@ Provider buttons add only a small capability-aware instruction wrapper:
 - Text: ChatGPT, Claude, Gemini, Grok, and Generic.
 - Image: ChatGPT Images, Gemini Image, Grok Image, and Generic Image. Claude is hidden.
 - Video: Gemini Video, Grok Video, and Generic Video. ChatGPT and Claude are hidden.
-- Coding Loop: Codex, Claude Code, Gemini Coding, Grok, and Generic Loop.
+- Coding Loop: Codex, Claude Code, Google Antigravity, Grok Build, and Generic Loop.
 
 The metric cards calculate token estimates from exact copy strings with `Math.ceil(text.length / 4)`: Generic output tokens, selected provider output tokens, provider adapter overhead, ratio, and percentage increase. Generic is always the baseline, so its overhead is `0`.
 
-## Validation And Privacy
+## Validation
 
-- Every static and Coding Loop field has a visible tip and an associated inline error region.
-- Numeric limits, positive video duration, FPS, Text lists, Coding Loop policies, apparent secret values, and potentially destructive commands are validated client-side.
+Every static and Coding Loop field has a visible tip and an associated inline error region.
+
+Most fields are optional. Text, Image, and Coding Loop all generate successfully from a completely empty form; only the video durations are required.
+
+**Required**
+
+- Video Basic: `Duration`.
+- Video Cinematic: `Sequence Duration` and `Output Duration`.
+
+Each must be greater than zero.
+
+**Required in pairs or by policy**
+
+- A time budget value requires its unit, and a unit requires its value.
+- A cost budget requires its currency, and a currency requires its amount.
+- `Network Access: Allowed hosts only` requires the `Allowed Network Hosts` list.
+- `Package Installation Policy: Allowed list only` requires the `Allowed Packages` list.
+
+**Checked only when a value is present**
+
+Character limits (500 for single-line fields, 5000 for textareas), a 50-entry cap on line-separated lists, a 200-character cap per command line, and numeric range and step limits.
+
+**Advisory only, not safety controls**
+
+- Apparent secret values are detected on `Required Environment Variable Names` and nowhere else. It matches common `NAME=value` shapes and will miss others.
+- The destructive-command check is a short, non-exhaustive denylist over command fields. It exists to catch an obvious slip while typing, not to make a prompt safe. Do not rely on it.
+
+**Regeneration and copying**
+
 - The form regenerates the output 225 ms after valid structured edits, but only after the first manual generation.
+- Changing task type or mode hides the previous payload when the new form is invalid, so one task type's prompt is never left on screen under another. It reappears once the new form validates.
+- Copy buttons do nothing until a generate has succeeded and the output section is visible.
 - Clear restores Text Prompting, default modes, Concise Markdown, Coding Loop defaults, collapsed advanced sections, and an empty output area.
-- The application uses no backend, analytics, browser storage, external scripts, fonts, runtime dependencies, network calls, or third-party assets. Prompt content remains in the browser.
 
-For public hosting, serve these static files over HTTPS.
+## Privacy
+
+The application uses no backend, analytics, browser storage, external scripts, fonts, runtime dependencies, network calls, or third-party assets. Prompt content stays in the browser.
+
+That boundary ends at the clipboard. Once a prompt is pasted into a provider, it is governed by that provider's terms, retention, and training policies.
+
+## Hosting
+
+Static files with no build step. Serve them over HTTPS.
+
+GitHub Pages is not currently serving this repository. `https://rayo76.github.io/` returns 404.
 
 ## Files
 

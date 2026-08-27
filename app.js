@@ -533,6 +533,7 @@
       const selected = button.dataset.promptType === type;
       button.classList.toggle("active", selected);
       button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
     });
     elements.promptType.value = type;
     updateProviderButtons(type);
@@ -911,6 +912,7 @@
     imageMode: "Choose Basic for a short brief or High Quality for detailed visual controls.",
     videoMode: "Choose Basic for a short brief or Cinematic for sequence-level controls.",
     vidBasicDuration: "Provide a duration greater than zero seconds.",
+    vidSequenceDuration: "Provide the sequence duration in seconds, greater than zero.",
     vidOutputDuration: "Provide the intended final duration in seconds, greater than zero.",
     vidFps: "Enter a whole frame rate between 1 and 240.",
     antiHallucinationGuard: "Prevents unsupported facts or sources, identifies unknowns, and labels assumptions. It cannot guarantee factual accuracy.",
@@ -960,6 +962,8 @@
     const text = control.value.trim();
     if (!text) {
       if (control.dataset.requiredPositive === "true") return "Enter a duration greater than 0.";
+      if (control.id === "allowedNetworkHosts" && value("networkAccess") === "allowed_hosts_only") return "List the approved hosts, one per line, or change Network Access.";
+      if (control.id === "allowedPackages" && value("packageInstallationPolicy") === "allowed_list_only") return "List the approved packages, one per line, or change Package Installation Policy.";
       if (control.id === "timeBudgetValue" && value("timeBudgetUnit")) return "Enter a time budget value.";
       if (control.id === "costBudget" && value("costCurrency")) return "Enter a cost budget amount.";
       return "";
@@ -1066,7 +1070,21 @@
     return true;
   }
 
+  function hideGeneratedOutput() {
+    window.clearTimeout(refreshTimer);
+    elements.generatedPayloadSection.hidden = true;
+    elements.output.textContent = "";
+    elements.outputDescription.textContent = "Provider-ready prompt";
+    [elements.genericTokens, elements.selectedProviderTokens, elements.providerAdapterOverhead].forEach(node => { node.textContent = "0"; });
+    elements.providerRatio.textContent = "0.00x";
+    elements.providerIncrease.textContent = "0%";
+  }
+
   function copyForProvider(provider) {
+    if (!hasGeneratedOutput || elements.generatedPayloadSection.hidden) {
+      showToast("Generate a prompt before copying.", true);
+      return;
+    }
     if (!validateActiveForm()) return;
     selectedProvider = provider;
     const data = getFormData();
@@ -1090,11 +1108,7 @@
     elements.evidenceGuardState.textContent = "On";
     elements.stepLockState.textContent = "On";
     elements.status.textContent = "";
-    elements.output.textContent = "";
-    elements.generatedPayloadSection.hidden = true;
-    [elements.genericTokens, elements.selectedProviderTokens, elements.providerAdapterOverhead].forEach(node => { node.textContent = "0"; });
-    elements.providerRatio.textContent = "0.00x";
-    elements.providerIncrease.textContent = "0%";
+    hideGeneratedOutput();
     elements.copyToast.classList.remove("visible", "error");
     applyTextCategoryPlaceholders();
     applyCodingCategoryGuidance();
@@ -1110,6 +1124,22 @@
     }, 225);
   }
 
+  // A task type or mode change replaces the schema, so the visible payload belongs to the
+  // previous form. Regenerate it when the new form is valid, otherwise hide it outright.
+  function refreshAfterTaskChange() {
+    if (!hasGeneratedOutput) return;
+    if (!validateActiveForm({ focus: false })) {
+      hideGeneratedOutput();
+      return;
+    }
+    scheduleOutputRefresh();
+  }
+
+  function activateTab(type) {
+    switchTab(type);
+    refreshAfterTaskChange();
+  }
+
   function initializeExistingLimits() {
     document.querySelectorAll("input[type='text']").forEach(input => { if (!input.maxLength || input.maxLength < 0) input.maxLength = 500; });
     document.querySelectorAll("textarea").forEach(textarea => { if (!textarea.maxLength || textarea.maxLength < 0) textarea.maxLength = 5000; });
@@ -1122,14 +1152,22 @@
   }
 
   function bindEvents() {
-    document.querySelectorAll(".tab-btn").forEach(button => button.addEventListener("click", () => {
-      switchTab(button.dataset.promptType);
-      scheduleOutputRefresh();
-    }));
+    const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+    tabButtons.forEach(button => button.addEventListener("click", () => activateTab(button.dataset.promptType)));
+    document.querySelector(".prompt-tabs").addEventListener("keydown", event => {
+      const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      const current = tabButtons.indexOf(document.activeElement);
+      if (current === -1) return;
+      event.preventDefault();
+      const next = tabButtons[(current + step + tabButtons.length) % tabButtons.length];
+      activateTab(next.dataset.promptType);
+      next.focus();
+    });
     elements.category.addEventListener("change", () => window.setTimeout(() => { applyTextCategoryPlaceholders(); scheduleOutputRefresh(); }, 0));
-    document.getElementById("imageMode").addEventListener("change", () => { updateModeVisibility(); scheduleOutputRefresh(); });
-    document.getElementById("videoMode").addEventListener("change", () => { updateModeVisibility(); scheduleOutputRefresh(); });
-    document.getElementById("codingMode").addEventListener("change", () => { updateModeVisibility(); scheduleOutputRefresh(); });
+    document.getElementById("imageMode").addEventListener("change", () => { updateModeVisibility(); refreshAfterTaskChange(); });
+    document.getElementById("videoMode").addEventListener("change", () => { updateModeVisibility(); refreshAfterTaskChange(); });
+    document.getElementById("codingMode").addEventListener("change", () => { updateModeVisibility(); refreshAfterTaskChange(); });
     document.getElementById("codingCategory").addEventListener("change", () => window.setTimeout(() => { applyCodingCategoryGuidance(); scheduleOutputRefresh(); }, 0));
     document.getElementById("iterationWorkflow").addEventListener("input", () => { workflowManaged = false; });
     document.getElementById("prompt-form").addEventListener("submit", event => {
