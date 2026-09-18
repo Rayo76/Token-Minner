@@ -12,6 +12,7 @@
     "Diet & Workout Plan": { role: "Qualified nutrition and fitness coach", targetAudience: "Fitness enthusiasts", objective: "Create a 12-week diet and workout plan", context: "Goals, restrictions, equipment, and schedule", mustInclude: "Meal structure\nWorkout progression", mustAvoid: "Extreme diets" },
     "Education & Learning": { role: "Curriculum designer", targetAudience: "Students", objective: "Create a structured learning path", context: "Current level, goal, available time, and resources", mustInclude: "Weekly schedule\nPractice tasks", mustAvoid: "Unmanageable workload" },
     "Debugging Issues": { role: "Senior debugging specialist", targetAudience: "Developers", objective: "Create a systematic diagnosis and fix plan", context: "Tech stack, symptoms, logs, and reproduction steps", mustInclude: "Evidence-based steps\nValidation", mustAvoid: "Unverified guesses" },
+    "Presentation/Pitch Deck": { role: "Senior presentation strategist and slide designer", targetAudience: "Investors or executive decision-makers", objective: "Create a persuasive 10-slide deck", context: "Subject, key message, time limit, and available data", mustInclude: "Slide-by-slide outline\nSpeaker notes", mustAvoid: "Invented statistics\nText-heavy slides" },
     "Other": { role: "", targetAudience: "", objective: "", context: "", mustInclude: "", mustAvoid: "" }
   };
 
@@ -19,7 +20,8 @@
     "Travel",
     "Health",
     "Financial Planning",
-    "Product Comparison"
+    "Product Comparison",
+    "Presentation/Pitch Deck"
   ]);
 
   function buildGuard(task, category, enabled) {
@@ -62,6 +64,7 @@
     "Diet & Workout Plan": ["analyze goals and restrictions", "build diet and workout plan", "validate safety and feasibility", "format output"],
     "Education & Learning": ["analyze current level and learning goals", "build learning plan", "validate workload and progression", "format output"],
     "Debugging Issues": ["analyze evidence", "diagnose root cause", "validate fix plan", "format output"],
+    "Presentation/Pitch Deck": ["analyze audience, goal, and core message", "build storyline and one-idea-per-slide outline", "validate flow, timing, and supporting evidence", "format output"],
     "Other": ["analyze input", "build response", "validate result", "format output"]
   };
 

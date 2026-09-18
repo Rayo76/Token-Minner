@@ -16,7 +16,7 @@ There is no raw-prompt detection, conversion, autofill, edit-source tracking, or
 
 ## Task Types
 
-- Text Prompting supports Travel, Health, Financial Planning, App/PRD spec, Product Comparison, Resume Optimization, Diet & Workout Plan, Education & Learning, Debugging Issues, and Other. Step Locking uses a category-specific process.
+- Text Prompting supports Travel, Health, Financial Planning, App/PRD spec, Product Comparison, Resume Optimization, Diet & Workout Plan, Education & Learning, Debugging Issues, Presentation/Pitch Deck, and Other. Step Locking uses a category-specific process.
 - Image Prompting supports Basic and High Quality briefs.
 - Video Prompting supports Basic and Cinematic briefs.
 - Coding Loop supports Basic and Advanced modes plus Feature Development, Bug Fixing, Refactoring & Migration, Testing & Quality, and Other categories.
