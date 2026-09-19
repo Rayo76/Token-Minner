@@ -96,13 +96,15 @@ Character limits (500 for single-line fields, 5000 for textareas), a 50-entry ca
 
 The application uses no backend, analytics, browser storage, external scripts, fonts, runtime dependencies, network calls, or third-party assets. Prompt content stays in the browser.
 
+The form sets `autocomplete="off"`, so browsers neither suggest earlier entries nor restore typed prompt content after a reload. Firefox otherwise refills the form on reload, and that leftover text would end up in the next generated prompt.
+
 That boundary ends at the clipboard. Once a prompt is pasted into a provider, it is governed by that provider's terms, retention, and training policies.
 
 ## Hosting
 
 Static files with no build step. Serve them over HTTPS.
 
-GitHub Pages is not currently serving this repository. `https://rayo76.github.io/` returns 404.
+Live on GitHub Pages at https://rayo76.github.io/Token-Minner/, served from the `TokenMinning` branch.
 
 ## Files
 
