@@ -8,7 +8,7 @@ Token Minner is a fully client-side, manual structured prompt builder.
 
 1. Select Text, Image, Video, or Coding Loop.
 2. Complete the structured fields for that task.
-3. Select Concise Markdown or JSON.
+3. Select Plain Text, Concise Markdown, or JSON.
 4. Generate the provider-independent canonical output.
 5. Copy the canonical output or a provider-adapted version.
 
@@ -23,23 +23,38 @@ There is no raw-prompt detection, conversion, autofill, edit-source tracking, or
 
 ## Output Format
 
-- Concise Markdown uses readable task-specific headings and labels.
-- JSON is always minified with `JSON.stringify(data)`.
-- Empty values, empty lists, optional media selects left as `Not specified`, and Text `max_tokens: 0` are omitted.
-- Compact readable JSON keys reduce overhead without using cryptic single-letter keys. Examples include `cat`, `aud`, `obj`, `ctx`, `inc`, `val`, `steps`, `done`, `tasks`, `iter`, `exec`, and `gates`.
+- **Plain Text** (default) writes one `Label: value` line per field, joins lists with semicolons, and uses no markup. It uses the fewest tokens.
+- **Concise Markdown** uses readable task-specific headings and labels.
+- **JSON** is always minified with `JSON.stringify`.
+- Every format omits empty values, empty lists, optional selects left as `Not specified`, the `Other` category, and screen-only settings such as Basic/Advanced mode.
+- Dropdown choices are sent as their readable labels, for example `Before risky actions` rather than `before_risky_actions`.
+- Compact readable JSON keys reduce overhead without using cryptic single-letter keys. Examples include `cat`, `aud`, `obj`, `ctx`, `inc`, `steps`, `reply`, `done`, `tasks`, `iter`, `exec`, and `gates`.
+
+## Keeping Replies Short
+
+The reply is usually longer than the prompt, so every text prompt also shapes the reply:
+
+- **Reply length** caps the answer in words: Brief (150), Standard (375, the default), Detailed (900), or No limit. Models follow word caps more reliably than token counts, and a prompt pasted into a chat window cannot set `max_tokens`.
+- Every text prompt asks for no preamble, restated task, or closing summary.
+- With Step Locking on, the steps are listed and the model is asked not to narrate them.
+- The Anti-Hallucination Guard asks for unknowns and assumptions to be flagged inline rather than in separate sections.
+- Coding Loop per-iteration reports default to 5 lines with commands but no logs, and a required final diff review asks the agent to review the diff without printing it.
+
+These changes are expected to shorten replies; the app cannot measure reply length itself.
 
 ## Canonical And Provider Copies
 
-The Generated Output is the canonical provider-independent prompt. **Copy Generic** copies that exact Markdown or minified JSON string without a wrapper, provider instructions, metadata, or duplicated requirements.
+The Generated Output is the canonical provider-independent prompt. **Copy Generic** copies that exact string with nothing added.
 
-Provider buttons add only a small capability-aware instruction wrapper:
+Each provider button adds exactly one line:
 
-- Text: ChatGPT, Claude, Gemini, Grok, and Generic.
-- Image: ChatGPT Images, Gemini Image, Grok Image, and Generic Image. Claude is hidden.
-- Video: Gemini Video, Grok Video, and Generic Video. ChatGPT and Claude are hidden.
-- Coding Loop: Codex, Claude Code, Google Antigravity, Grok Build, and Generic Loop.
+- Text: ChatGPT, Claude, Gemini, and Grok each get one note against padding, such as follow-up offers, multiple alternatives, key-takeaway sections, or jokes and asides.
+- Image (ChatGPT Images, Gemini Image, Grok Image) and Video (Gemini Video, Grok Video): generate the media now and return only the media, without rewriting the prompt or describing the result. Claude is hidden for both, and ChatGPT is hidden for video.
+- Coding Loop (Codex, Claude Code, Google Antigravity, Grok Build): run the bounded loop within its constraints, plus one provider-specific clause.
 
-The metric cards calculate token estimates from exact copy strings with `Math.ceil(text.length / 4)`: Generic output tokens, selected provider output tokens, provider adapter overhead, ratio, and percentage increase. Generic is always the baseline, so its overhead is `0`.
+In JSON the line becomes `{"instruction": "...", "request": {...}}`.
+
+The metric cards estimate tokens with `Math.ceil(text.length / 4)`: generic prompt tokens, selected provider prompt tokens, provider adapter overhead, ratio, and percentage increase. Generic is always the baseline, so its overhead is `0`. **Reply Budget** converts the Reply length word cap to tokens at about 4 tokens per 3 words, and shows `n/a` for image, video, and coding tasks.
 
 ## Validation
 
@@ -75,7 +90,7 @@ Character limits (500 for single-line fields, 5000 for textareas), a 50-entry ca
 - The form regenerates the output 225 ms after valid structured edits, but only after the first manual generation.
 - Changing task type or mode hides the previous payload when the new form is invalid, so one task type's prompt is never left on screen under another. It reappears once the new form validates.
 - Copy buttons do nothing until a generate has succeeded and the output section is visible.
-- Clear restores Text Prompting, default modes, Concise Markdown, Coding Loop defaults, collapsed advanced sections, and an empty output area.
+- Clear restores Text Prompting, default modes, Plain Text, Standard reply length, Coding Loop defaults, collapsed advanced sections, and an empty output area.
 
 ## Privacy
 
@@ -92,5 +107,5 @@ GitHub Pages is not currently serving this repository. `https://rayo76.github.io
 ## Files
 
 - `index.html`: Accessible interface structure and fields.
-- `app.js`: Validation, compact schema builders, Markdown renderers, provider adapters, token metrics, clipboard fallback, and reset behavior.
+- `app.js`: Validation, compact schema builders, plain-text and Markdown renderers, provider notes, token metrics, clipboard fallback, and reset behavior.
 - `styles.css`: Responsive styling for forms, inline feedback, generated output, and metric cards.

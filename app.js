@@ -29,14 +29,13 @@
 
     if (task === "text") {
       const guard = [
-        "no_guess",
-        "state_unknowns",
-        "label_assumptions",
-        "no_fake_sources"
+        "use only supplied facts or actual tool results",
+        "flag unknowns and assumptions inline",
+        "never invent sources"
       ];
 
       if (CURRENT_DATA_CATEGORIES.has(category)) {
-        guard.push("mark_unverified_current_data");
+        guard.push("mark unverified current data");
       }
 
       return guard;
@@ -44,10 +43,10 @@
 
     if (task === "coding_loop") {
       return [
-        "evidence_for_claims",
-        "no_claim_unrun",
-        "ask_or_stop_unknowns",
-        "no_inferred_permissions"
+        "back every claim with evidence",
+        "report only actions performed and results observed",
+        "stop and ask on unknowns",
+        "never infer permissions"
       ];
     }
 
@@ -55,17 +54,17 @@
   }
 
   const TEXT_STEP_TEMPLATES = {
-    "Travel": ["analyze trip requirements", "build itinerary", "validate logistics and budget", "format output"],
-    "Health": ["analyze health context", "build safe wellness guidance", "validate limitations and uncertainty", "format output"],
-    "Financial Planning": ["analyze financial context", "build financial plan", "validate assumptions and risks", "format output"],
-    "App/PRD spec": ["analyze product requirements", "build specification", "validate scope and acceptance criteria", "format output"],
-    "Product Comparison": ["analyze comparison criteria", "compare products", "validate evidence and tradeoffs", "format output"],
-    "Resume Optimization": ["analyze target role and experience", "optimize resume", "validate factual accuracy and ATS fit", "format output"],
-    "Diet & Workout Plan": ["analyze goals and restrictions", "build diet and workout plan", "validate safety and feasibility", "format output"],
-    "Education & Learning": ["analyze current level and learning goals", "build learning plan", "validate workload and progression", "format output"],
-    "Debugging Issues": ["analyze evidence", "diagnose root cause", "validate fix plan", "format output"],
-    "Presentation/Pitch Deck": ["analyze audience, goal, and core message", "build storyline and one-idea-per-slide outline", "validate flow, timing, and supporting evidence", "format output"],
-    "Other": ["analyze input", "build response", "validate result", "format output"]
+    "Travel": ["analyze trip requirements", "build itinerary", "validate logistics and budget"],
+    "Health": ["analyze health context", "build safe wellness guidance", "validate limitations and uncertainty"],
+    "Financial Planning": ["analyze financial context", "build financial plan", "validate assumptions and risks"],
+    "App/PRD spec": ["analyze product requirements", "build specification", "validate scope and acceptance criteria"],
+    "Product Comparison": ["analyze comparison criteria", "compare products", "validate evidence and tradeoffs"],
+    "Resume Optimization": ["analyze target role and experience", "optimize resume", "validate factual accuracy and ATS fit"],
+    "Diet & Workout Plan": ["analyze goals and restrictions", "build diet and workout plan", "validate safety and feasibility"],
+    "Education & Learning": ["analyze current level and learning goals", "build learning plan", "validate workload and progression"],
+    "Debugging Issues": ["analyze evidence", "diagnose root cause", "validate fix plan"],
+    "Presentation/Pitch Deck": ["analyze audience, goal, and core message", "build storyline and one-idea-per-slide outline", "validate flow, timing, and supporting evidence"],
+    "Other": ["analyze input", "build response", "validate result"]
   };
 
   const GENERIC_WORKFLOW = [
@@ -194,7 +193,7 @@
     {
       title: "Reporting",
       fields: [
-        field("iterationReport", "Per-Iteration Report", "specify the evidence reported after each iteration.", { type: "textarea", defaultValue: "Concise summary, files changed, commands run, validation results, blockers, and next action" }),
+        field("iterationReport", "Per-Iteration Report", "specify the evidence reported after each iteration.", { type: "textarea", defaultValue: "Max 5 lines: summary, files changed, commands run (no logs), validation results, blockers, next action" }),
         field("finalReportRequirements", "Final Report Requirements", "specify final evidence, limitations, and unresolved risks.", { type: "textarea" })
       ]
     }
@@ -547,6 +546,18 @@
     return document.getElementById(id)?.value.trim() || "";
   }
 
+  // "Other" carries no information, so it never reaches the prompt.
+  function categoryValue(id) {
+    const category = value(id);
+    return category === "Other" ? "" : category;
+  }
+
+  // Selects carry machine values (before_risky_actions); the prompt gets the readable label.
+  function choice(id) {
+    const control = document.getElementById(id);
+    return control && control.value ? control.options[control.selectedIndex].text.trim() : "";
+  }
+
   function lines(id) {
     return value(id).split(/\r?\n/).map(item => item.trim()).filter(Boolean);
   }
@@ -576,7 +587,7 @@
     const data = {
       task: "coding_loop",
       mode: value("codingMode"),
-      cat: value("codingCategory"),
+      cat: categoryValue("codingCategory"),
       guard: buildGuard("coding_loop", value("codingCategory"), document.getElementById("evidenceGuard").checked),
       name: value("loopName"),
       role: value("agentRole"),
@@ -598,7 +609,7 @@
         checks: lines("validationCommands"),
         avoid: lines("codingMustAvoid")
       },
-      approval: { human_approval: value("humanApproval") },
+      approval: { human_approval: choice("humanApproval") },
       stop: lines("stopConditions"),
       report: {
         per_iteration: value("iterationReport"),
@@ -612,31 +623,31 @@
         workdir: value("workingDirectory"),
         base_branch: value("baseBranch"),
         work_branch: value("workBranch"),
-        branch_strategy: value("branchStrategy"),
+        branch_strategy: choice("branchStrategy"),
         runtime: value("runtimeLanguage"),
         os: value("operatingSystem"),
         setup_cmds: lines("environmentSetupCommands"),
         env_names: lines("environmentVariableNames"),
-        network: value("networkAccess"),
+        network: choice("networkAccess"),
         allowed_hosts: lines("allowedNetworkHosts"),
-        package_policy: value("packageInstallationPolicy"),
+        package_policy: choice("packageInstallationPolicy"),
         allowed_packages: lines("allowedPackages")
       });
       data.plan = {
         priority: value("priorityOrder"),
         select: value("taskSelectionRule"),
-        requirement: value("planningRequirement"),
+        requirement: choice("planningRequirement"),
         max_active: numberValue("maxActiveTasks"),
         dependencies: value("dependencyHandling"),
-        unknowns: value("unknownsPolicy")
+        unknowns: choice("unknownsPolicy")
       };
       Object.assign(data.exec, {
-        autonomy: value("autonomyLevel"),
+        autonomy: choice("autonomyLevel"),
         allowed_ops: lines("allowedOperations"),
         forbidden_ops: lines("forbiddenOperations"),
         blocked_cmds: lines("blockedCommands"),
-        file_create: value("fileCreationPolicy"),
-        file_delete: value("fileDeletionPolicy"),
+        file_create: choice("fileCreationPolicy"),
+        file_delete: choice("fileDeletionPolicy"),
         dependency_changes: value("dependencyChangePolicy"),
         config_changes: value("configurationChangePolicy"),
         secrets: value("secretsPolicy"),
@@ -654,7 +665,7 @@
         min_coverage: numberValue("minimumCoverage"),
         acceptance: lines("acceptanceChecks"),
         order: lines("gateOrder"),
-        on_failure: value("gateFailureBehavior"),
+        on_failure: choice("gateFailureBehavior"),
         baseline_failure: value("baselineFailurePolicy")
       };
       data.limits = {
@@ -662,18 +673,18 @@
         retries: numberValue("commandRetryLimit"),
         max_files: numberValue("maxChangedFiles"),
         max_diff_lines: numberValue("maxDiffLines"),
-        time: { value: numberValue("timeBudgetValue"), unit: value("timeBudgetUnit") },
+        time: { value: numberValue("timeBudgetValue"), unit: choice("timeBudgetUnit") },
         tokens: numberValue("tokenBudget"),
-        cost: { amount: numberValue("costBudget"), currency: value("costCurrency") },
+        cost: { amount: numberValue("costBudget"), currency: choice("costCurrency") },
         on_exceeded: value("budgetExceededBehavior")
       };
       data.git = {
-        commit: value("commitPolicy"),
+        commit: choice("commitPolicy"),
         message_pattern: value("commitMessagePattern"),
-        push: value("pushPolicy"),
-        pull_request: value("pullRequestPolicy"),
+        push: choice("pushPolicy"),
+        pull_request: choice("pullRequestPolicy"),
         amend: value("amendCommits"),
-        rebase: value("rebasePolicy"),
+        rebase: choice("rebasePolicy"),
         generated_files: value("generatedFilesPolicy"),
         lockfiles: value("lockfilePolicy")
       };
@@ -686,7 +697,7 @@
         timeout: value("approvalTimeoutBehavior")
       });
       data.recovery = {
-        checkpoint: value("checkpointAfterIteration"),
+        checkpoint: choice("checkpointAfterIteration"),
         checkpoint_contents: lines("checkpointContents"),
         rollback: value("rollbackPolicy"),
         failure_analysis: value("failureAnalysisRequirement"),
@@ -695,13 +706,13 @@
         resume: value("resumeInstructions")
       };
       Object.assign(data.report, {
-        changed_files: value("reportChangedFiles"),
-        commands: value("reportCommandsRun"),
-        validation: value("reportValidationResults"),
-        remaining_risks: value("reportRemainingRisks"),
-        unfinished_tasks: value("reportUnfinishedTasks"),
-        final_diff_review: value("finalDiffReview"),
-        status: value("completionStatus")
+        changed_files: choice("reportChangedFiles"),
+        commands: choice("reportCommandsRun"),
+        validation: choice("reportValidationResults"),
+        remaining_risks: choice("reportRemainingRisks"),
+        unfinished_tasks: choice("reportUnfinishedTasks"),
+        final_diff_review: value("finalDiffReview") === "yes" ? "review the full diff without printing it" : choice("finalDiffReview"),
+        status: choice("completionStatus")
       });
     }
     return pruneEmpty(data);
@@ -712,17 +723,16 @@
     if (type === "coding") return buildCodingData();
     if (type === "image") {
       if (value("imageMode") === "basic") return pruneEmpty({ task: "image", mode: "basic", subj: value("imgBasicSubject"), style: value("imgBasicStyle"), scene: value("imgBasicScene"), visual: { lighting: value("imgBasicLighting") }, comp: { description: value("imgBasicComposition") } });
-      return pruneEmpty({ task: "image", mode: "high", subj: { name: value("imgHqSubject"), type: value("imgSubjectType"), details: value("imgSubjectDetails"), action: value("imgSubjectAction") }, scene: { description: value("imgHqScene"), location: value("imgLocation"), environment: value("imgEnvironment"), time: value("imgTimeOfDay"), weather: value("imgWeather") }, style: { description: value("imgHqStyle"), genre: value("imgGenre"), inspiration: value("imgInspiration"), realism: value("imgRealism"), mood: value("imgMood") }, visual: { lighting: value("imgLighting"), palette: value("imgColourPalette"), contrast: value("imgContrast"), textures: value("imgTextures") }, cam: { angle: value("imgAngle"), lens: value("imgLens"), dof: value("imgDepthOfField"), focus: value("imgFocus") }, comp: { description: value("imgHqComposition"), framing: value("imgFraming"), rule: value("imgRule"), motion: value("imgMotion") }, out: { resolution: value("imgResolution"), ratio: value("imgAspectRatio"), quality: value("imgQuality") }, constraints: { negative: value("imgNegativePrompt"), avoid: lines("imgAvoid") } });
+      return pruneEmpty({ task: "image", mode: "high", subj: { name: value("imgHqSubject"), type: value("imgSubjectType"), details: value("imgSubjectDetails"), action: value("imgSubjectAction") }, scene: { description: value("imgHqScene"), location: value("imgLocation"), environment: value("imgEnvironment"), time: value("imgTimeOfDay"), weather: value("imgWeather") }, style: { description: value("imgHqStyle"), genre: value("imgGenre"), inspiration: value("imgInspiration"), realism: value("imgRealism"), mood: value("imgMood") }, visual: { lighting: value("imgLighting"), palette: value("imgColourPalette"), contrast: value("imgContrast"), textures: value("imgTextures") }, cam: { angle: value("imgAngle"), lens: value("imgLens"), dof: value("imgDepthOfField"), focus: value("imgFocus") }, comp: { description: value("imgHqComposition"), framing: value("imgFraming"), rule: choice("imgRule"), motion: value("imgMotion") }, out: { resolution: value("imgResolution"), ratio: value("imgAspectRatio"), quality: value("imgQuality") }, constraints: { negative: value("imgNegativePrompt"), avoid: lines("imgAvoid") } });
     }
     if (type === "video") {
       if (value("videoMode") === "basic") return pruneEmpty({ task: "video", mode: "basic", subj: value("vidBasicSubject"), style: value("vidBasicStyle"), scene: value("vidBasicScene"), duration: numberValue("vidBasicDuration"), cam: value("vidBasicCamera") });
       return pruneEmpty({ task: "video", mode: "cinematic", subj: { name: value("vidSubject"), type: value("vidType"), details: value("vidDetails"), action: value("vidAction") }, scene: { description: value("vidScene"), location: value("vidLocation"), environment: value("vidEnvironment"), time: value("vidTimeOfDay"), weather: value("vidWeather") }, seq: { shot: value("vidShot"), action: value("vidSequenceAction"), duration: numberValue("vidSequenceDuration") }, cam: { movement: value("vidMovement"), angle: value("vidAngle"), lens: value("vidLens"), stabilization: value("vidStabilization") }, style: { genre: value("vidGenre"), mood: value("vidMood"), realism: value("vidRealism"), reference: value("vidReference") }, visual: { lighting: value("vidLighting"), grading: value("vidColorGrading"), effects: value("vidEffects") }, audio: { music: value("vidMusic"), sfx: value("vidSfx"), voiceover: value("vidVoiceover") }, out: { duration: numberValue("vidOutputDuration"), resolution: value("vidResolution"), fps: numberValue("vidFps"), ratio: value("vidAspectRatio") }, constraints: { negative: value("vidNegativePrompt"), avoid: lines("vidAvoid") } });
     }
 
-    const maxTokens = numberValue("maxTokens");
     return pruneEmpty({
       task: "text",
-      cat: value("category"),
+      cat: categoryValue("category"),
       role: value("role"),
       aud: value("targetAudience"),
       obj: value("objective"),
@@ -733,13 +743,23 @@
       steps: elements.stepLocking.checked
         ? (TEXT_STEP_TEMPLATES[value("category")] || TEXT_STEP_TEMPLATES.Other)
         : [],
-      temp: numberValue("temperature"),
-      max_tokens: maxTokens === 0 ? "" : maxTokens
+      reply: buildReply()
     });
   }
 
+  // Models follow word caps far better than token counts, and a pasted prompt cannot set max_tokens.
+  function buildReply() {
+    const words = numberValue("replyLength");
+    return [
+      words ? `max ${words} words` : "",
+      elements.stepLocking.checked ? "don't narrate the steps" : "",
+      "no preamble, restated task, or closing summary"
+    ].filter(Boolean);
+  }
+
   function getOutputType() {
-    return elements.outputJson.checked ? "json" : "markdown";
+    if (elements.outputJson.checked) return "json";
+    return elements.outputMarkdown.checked ? "markdown" : "plain";
   }
 
   function readableLabel(key) {
@@ -747,141 +767,236 @@
     return labels[key] || key.replace(/_/g, " ").replace(/\b\w/g, character => character.toUpperCase());
   }
 
-  function addMarkdownValue(output, label, item) {
-    if (item === "" || item === undefined || item === null || (Array.isArray(item) && !item.length)) return;
-    if (Array.isArray(item)) {
-      output.push(`## ${label}`);
-      item.forEach(entry => output.push(`- ${String(entry).replace(/\r?\n/g, " ")}`));
-      return;
-    }
-    if (item && typeof item === "object") {
-      addMarkdownSection(output, label, item);
-      return;
-    }
-    output.push(`- **${label}:** ${String(item).replace(/\r?\n/g, " ")}`);
+  function isEmptyValue(item) {
+    return item === "" || item === undefined || item === null || (Array.isArray(item) && !item.length);
   }
 
+  function inlineText(item) {
+    return String(item).replace(/\r?\n/g, " ");
+  }
+
+  // Nested lists join with the given separator; nested pairs such as { value: 2, unit: "Hours" } read as "2 Hours".
+  function nestedText(item, separator) {
+    if (Array.isArray(item)) return item.map(inlineText).join(separator);
+    if (item && typeof item === "object") return Object.values(item).filter(entry => !isEmptyValue(entry)).map(inlineText).join(" ");
+    return inlineText(item);
+  }
+
+  function addMarkdownValue(output, label, item, labels) {
+    if (isEmptyValue(item)) return;
+    if (Array.isArray(item)) {
+      output.push(`## ${label}`);
+      item.forEach(entry => output.push(`- ${inlineText(entry)}`));
+      return;
+    }
+    if (typeof item === "object") {
+      addMarkdownSection(output, label, item, labels);
+      return;
+    }
+    output.push(`- **${label}:** ${inlineText(item)}`);
+  }
+
+  // Lists inside a section nest under their own bullet so later entries stay in the section.
   function addMarkdownSection(output, label, values, labels) {
-    const entries = Object.entries(values || {}).filter(([, item]) => item !== "" && item !== undefined && item !== null && (!Array.isArray(item) || item.length));
+    const entries = Object.entries(values || {}).filter(([, item]) => !isEmptyValue(item));
     if (!entries.length) return;
     output.push(`## ${label}`);
-    entries.forEach(([key, item]) => addMarkdownValue(output, labels?.[key] || readableLabel(key), item));
+    entries.forEach(([key, item]) => {
+      const itemLabel = labels?.[key] || readableLabel(key);
+      if (Array.isArray(item)) {
+        output.push(`- **${itemLabel}:**`);
+        item.forEach(entry => output.push(`  - ${inlineText(entry)}`));
+      } else {
+        output.push(`- **${itemLabel}:** ${nestedText(item)}`);
+      }
+    });
   }
+
+  function addPlainValue(output, label, item, labels) {
+    if (isEmptyValue(item)) return;
+    if (typeof item === "object" && !Array.isArray(item)) {
+      addPlainSection(output, label, item, labels);
+      return;
+    }
+    output.push(`${label}: ${nestedText(item, "; ")}`);
+  }
+
+  // One line per section; an entry named like its section (Subject > Subject) prints its value alone.
+  function addPlainSection(output, label, values, labels) {
+    const parts = Object.entries(values || {}).filter(([, item]) => !isEmptyValue(item)).map(([key, item]) => {
+      const itemLabel = labels?.[key] || readableLabel(key);
+      const text = nestedText(item, ", ");
+      return itemLabel === label ? text : `${itemLabel.toLowerCase()}: ${text}`;
+    });
+    if (parts.length) output.push(`${label}: ${parts.join("; ")}`);
+  }
+
+  const IMAGE_HQ_SECTIONS = [
+    ["Subject", "subj", { name: "Subject", type: "Type", details: "Details", action: "Action" }],
+    ["Scene", "scene", { description: "Scene", location: "Location", environment: "Environment", time: "Time of day", weather: "Weather" }],
+    ["Style", "style", { description: "Style", genre: "Genre", inspiration: "Inspiration", realism: "Realism", mood: "Mood" }],
+    ["Visual", "visual", { lighting: "Lighting", palette: "Colour palette", contrast: "Contrast", textures: "Textures" }],
+    ["Camera", "cam", { angle: "Angle", lens: "Lens", dof: "Depth of field", focus: "Focus" }],
+    ["Composition", "comp", { description: "Composition", framing: "Framing", rule: "Rule", motion: "Motion" }],
+    ["Output", "out", { resolution: "Resolution", ratio: "Aspect ratio", quality: "Quality" }],
+    ["Constraints", "constraints", { negative: "Negative prompt", avoid: "Avoid" }]
+  ];
+
+  const VIDEO_BASIC_FIELDS = [["Subject", "subj"], ["Style", "style"], ["Scene", "scene"], ["Duration (seconds)", "duration"], ["Camera", "cam"]];
+
+  const VIDEO_CINEMATIC_SECTIONS = [
+    ["Subject", "subj", { name: "Subject", type: "Type", details: "Details", action: "Action" }],
+    ["Scene", "scene", { description: "Scene", location: "Location", environment: "Environment", time: "Time of day", weather: "Weather" }],
+    ["Sequence", "seq", { shot: "Shot", action: "Action", duration: "Duration (seconds)" }],
+    ["Camera", "cam", { movement: "Movement", angle: "Angle", lens: "Lens", stabilization: "Stabilization" }],
+    ["Style", "style", { genre: "Genre", mood: "Mood", realism: "Realism", reference: "Reference" }],
+    ["Visual", "visual", { lighting: "Lighting", grading: "Colour grading", effects: "Effects" }],
+    ["Audio", "audio", { music: "Music", sfx: "SFX", voiceover: "Voiceover" }],
+    ["Output", "out", { duration: "Duration (seconds)", resolution: "Resolution", fps: "FPS", ratio: "Aspect ratio" }],
+    ["Constraints", "constraints", { negative: "Negative prompt", avoid: "Avoid" }]
+  ];
+
+  const CODING_FIELDS = [
+    ["Category", "cat"],
+    ["Name", "name"],
+    ["Role", "role"],
+    ["Goal", "goal"],
+    ["Context", "ctx"],
+    ["Guard", "guard"],
+    ["Definition of Done", "done"],
+    ["Scope", "scope", { repository: "Repository scope", include: "Included paths", exclude: "Excluded paths", location: "Repository location", workdir: "Working directory", base_branch: "Base branch", work_branch: "Work branch", branch_strategy: "Branch strategy", runtime: "Runtime", os: "Operating system", setup_cmds: "Setup commands", env_names: "Environment variable names", network: "Network access", allowed_hosts: "Allowed hosts", package_policy: "Package policy", allowed_packages: "Allowed packages" }],
+    ["Tasks", "tasks"],
+    ["Iteration", "iter", { steps: "Steps", max_iter: "Maximum iterations" }],
+    ["Planning", "plan", { priority: "Priority order", select: "Task selection", requirement: "Requirement", max_active: "Maximum active tasks", dependencies: "Dependency handling", unknowns: "Unknowns" }],
+    ["Execution", "exec", { allowed_cmds: "Allowed commands", checks: "Validation commands", avoid: "Must avoid", autonomy: "Autonomy", allowed_ops: "Allowed operations", forbidden_ops: "Forbidden operations", blocked_cmds: "Blocked commands", file_create: "File creation", file_delete: "File deletion", dependency_changes: "Dependency changes", config_changes: "Configuration changes", secrets: "Secrets policy", destructive_actions: "Destructive actions" }],
+    ["Quality Gates", "gates"],
+    ["Limits", "limits"],
+    ["Git", "git"],
+    ["Approval", "approval"],
+    ["Stop Conditions", "stop"],
+    ["Recovery", "recovery"],
+    ["Reporting", "report"]
+  ];
 
   function renderTextMarkdown(data) {
     const output = ["# Text Request"];
-    [["Category", data.cat], ["Role", data.role], ["Target Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx], ["Temperature", data.temp], ["Max Tokens", data.max_tokens]].forEach(([label, item]) => addMarkdownValue(output, label, item));
+    [["Category", data.cat], ["Role", data.role], ["Target Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx]].forEach(([label, item]) => addMarkdownValue(output, label, item));
     addMarkdownValue(output, "Must Include", data.inc);
     addMarkdownValue(output, "Must Avoid", data.avoid);
     addMarkdownValue(output, "Guard", data.guard);
     addMarkdownValue(output, "Steps", data.steps);
+    addMarkdownValue(output, "Reply", data.reply);
+    return output.join("\n");
+  }
+
+  function renderTextPlain(data) {
+    const output = [];
+    [["Category", data.cat], ["Role", data.role], ["Audience", data.aud], ["Task", data.obj], ["Context", data.ctx], ["Include", data.inc], ["Avoid", data.avoid], ["Rules", data.guard], ["Steps", data.steps], ["Reply", data.reply]].forEach(([label, item]) => addPlainValue(output, label, item));
     return output.join("\n");
   }
 
   function renderImageMarkdown(data) {
     const output = ["# Image Generation"];
-    addMarkdownValue(output, "Mode", data.mode);
     if (data.mode === "basic") {
       [["Subject", data.subj], ["Style", data.style], ["Scene", data.scene]].forEach(([label, item]) => addMarkdownValue(output, label, item));
       addMarkdownSection(output, "Visual", data.visual, { lighting: "Lighting" });
       addMarkdownSection(output, "Composition", data.comp, { description: "Description" });
     } else {
-      addMarkdownSection(output, "Subject", data.subj, { name: "Subject", type: "Type", details: "Details", action: "Action" });
-      addMarkdownSection(output, "Scene", data.scene, { description: "Scene", location: "Location", environment: "Environment", time: "Time of day", weather: "Weather" });
-      addMarkdownSection(output, "Style", data.style, { description: "Style", genre: "Genre", inspiration: "Inspiration", realism: "Realism", mood: "Mood" });
-      addMarkdownSection(output, "Visual", data.visual, { lighting: "Lighting", palette: "Colour palette", contrast: "Contrast", textures: "Textures" });
-      addMarkdownSection(output, "Camera", data.cam, { angle: "Angle", lens: "Lens", dof: "Depth of field", focus: "Focus" });
-      addMarkdownSection(output, "Composition", data.comp, { description: "Composition", framing: "Framing", rule: "Rule", motion: "Motion" });
-      addMarkdownSection(output, "Output", data.out, { resolution: "Resolution", ratio: "Aspect ratio", quality: "Quality" });
-      addMarkdownSection(output, "Constraints", data.constraints, { negative: "Negative prompt", avoid: "Avoid" });
+      IMAGE_HQ_SECTIONS.forEach(([label, key, labels]) => addMarkdownSection(output, label, data[key], labels));
+    }
+    return output.join("\n");
+  }
+
+  function renderImagePlain(data) {
+    const output = ["Image generation"];
+    if (data.mode === "basic") {
+      [["Subject", data.subj], ["Style", data.style], ["Scene", data.scene], ["Lighting", data.visual?.lighting], ["Composition", data.comp?.description]].forEach(([label, item]) => addPlainValue(output, label, item));
+    } else {
+      IMAGE_HQ_SECTIONS.forEach(([label, key, labels]) => addPlainSection(output, label, data[key], labels));
     }
     return output.join("\n");
   }
 
   function renderVideoMarkdown(data) {
     const output = ["# Video Generation"];
-    addMarkdownValue(output, "Mode", data.mode);
     if (data.mode === "basic") {
-      [["Subject", data.subj], ["Style", data.style], ["Scene", data.scene], ["Duration (seconds)", data.duration], ["Camera", data.cam]].forEach(([label, item]) => addMarkdownValue(output, label, item));
+      VIDEO_BASIC_FIELDS.forEach(([label, key]) => addMarkdownValue(output, label, data[key]));
     } else {
-      addMarkdownSection(output, "Subject", data.subj, { name: "Subject", type: "Type", details: "Details", action: "Action" });
-      addMarkdownSection(output, "Scene", data.scene, { description: "Scene", location: "Location", environment: "Environment", time: "Time of day", weather: "Weather" });
-      addMarkdownSection(output, "Sequence", data.seq, { shot: "Shot", action: "Action", duration: "Duration (seconds)" });
-      addMarkdownSection(output, "Camera", data.cam, { movement: "Movement", angle: "Angle", lens: "Lens", stabilization: "Stabilization" });
-      addMarkdownSection(output, "Style", data.style, { genre: "Genre", mood: "Mood", realism: "Realism", reference: "Reference" });
-      addMarkdownSection(output, "Visual", data.visual, { lighting: "Lighting", grading: "Colour grading", effects: "Effects" });
-      addMarkdownSection(output, "Audio", data.audio, { music: "Music", sfx: "SFX", voiceover: "Voiceover" });
-      addMarkdownSection(output, "Output", data.out, { duration: "Duration (seconds)", resolution: "Resolution", fps: "FPS", ratio: "Aspect ratio" });
-      addMarkdownSection(output, "Constraints", data.constraints, { negative: "Negative prompt", avoid: "Avoid" });
+      VIDEO_CINEMATIC_SECTIONS.forEach(([label, key, labels]) => addMarkdownSection(output, label, data[key], labels));
+    }
+    return output.join("\n");
+  }
+
+  function renderVideoPlain(data) {
+    const output = ["Video generation"];
+    if (data.mode === "basic") {
+      VIDEO_BASIC_FIELDS.forEach(([label, key]) => addPlainValue(output, label, data[key]));
+    } else {
+      VIDEO_CINEMATIC_SECTIONS.forEach(([label, key, labels]) => addPlainSection(output, label, data[key], labels));
     }
     return output.join("\n");
   }
 
   function renderCodingLoopMarkdown(data) {
     const output = ["# Coding Loop"];
-    [["Mode", data.mode], ["Category", data.cat], ["Name", data.name], ["Role", data.role], ["Goal", data.goal], ["Context", data.ctx]].forEach(([label, item]) => addMarkdownValue(output, label, item));
-    addMarkdownValue(output, "Guard", data.guard);
-    addMarkdownValue(output, "Definition of Done", data.done);
-    addMarkdownSection(output, "Scope", data.scope, { repository: "Repository scope", include: "Included paths", exclude: "Excluded paths", location: "Repository location", workdir: "Working directory", base_branch: "Base branch", work_branch: "Work branch", branch_strategy: "Branch strategy", runtime: "Runtime", os: "Operating system", setup_cmds: "Setup commands", env_names: "Environment variable names", network: "Network access", allowed_hosts: "Allowed hosts", package_policy: "Package policy", allowed_packages: "Allowed packages" });
-    addMarkdownValue(output, "Tasks", data.tasks);
-    addMarkdownSection(output, "Iteration", data.iter, { steps: "Steps", max_iter: "Maximum iterations" });
-    addMarkdownSection(output, "Execution", data.exec, { allowed_cmds: "Allowed commands", checks: "Validation commands", avoid: "Must avoid", autonomy: "Autonomy", allowed_ops: "Allowed operations", forbidden_ops: "Forbidden operations", blocked_cmds: "Blocked commands", file_create: "File creation", file_delete: "File deletion", dependency_changes: "Dependency changes", config_changes: "Configuration changes", secrets: "Secrets policy", destructive_actions: "Destructive actions" });
-    addMarkdownSection(output, "Quality Gates", data.gates);
-    addMarkdownSection(output, "Limits", data.limits);
-    addMarkdownSection(output, "Git", data.git);
-    addMarkdownSection(output, "Approval", data.approval);
-    addMarkdownValue(output, "Stop Conditions", data.stop);
-    addMarkdownSection(output, "Recovery", data.recovery);
-    addMarkdownSection(output, "Reporting", data.report);
+    CODING_FIELDS.forEach(([label, key, labels]) => addMarkdownValue(output, label, data[key], labels));
     return output.join("\n");
   }
+
+  function renderCodingLoopPlain(data) {
+    const output = ["Coding loop"];
+    CODING_FIELDS.forEach(([label, key, labels]) => addPlainValue(output, label, data[key], labels));
+    return output.join("\n");
+  }
+
+  const RENDERERS = {
+    plain: { text: renderTextPlain, image: renderImagePlain, video: renderVideoPlain, coding_loop: renderCodingLoopPlain },
+    markdown: { text: renderTextMarkdown, image: renderImageMarkdown, video: renderVideoMarkdown, coding_loop: renderCodingLoopMarkdown }
+  };
 
   function minifiedJson(data) {
     return JSON.stringify(data);
   }
 
-  function serializePrompt(data) {
-    if (getOutputType() === "json") return minifiedJson(data);
-    if (data.task === "image") return renderImageMarkdown(data);
-    if (data.task === "video") return renderVideoMarkdown(data);
-    if (data.task === "coding_loop") return renderCodingLoopMarkdown(data);
-    return renderTextMarkdown(data);
+  // The form mode picks the renderer layout; it is not an instruction, so the model never sees it.
+  function promptData(data) {
+    const request = { ...data };
+    delete request.mode;
+    return request;
   }
 
-  function providerPrompt(provider, data) {
-    if (provider === "generic") return serializePrompt(data);
-    const baseInstruction = data.task === "coding_loop"
-      ? "Execute the supplied bounded coding loop and preserve its constraints."
-      : data.task === "image"
-        ? "Generate the image now from the supplied specifications. Return the image rather than rewriting the prompt."
-        : data.task === "video"
-          ? "Generate the video now from the supplied specifications. Return the video rather than rewriting the prompt."
-          : "Complete the text task from the supplied role, objective, context, and constraints.";
-    const guardInstruction = data.guard && data.task === "text"
-      ? "Use supplied facts or actual tool results; mark anything else unknown or unverified."
-      : data.guard && data.task === "coding_loop"
-        ? "Report only actions performed and results observed."
-        : "";
-    const instruction = [baseInstruction, guardInstruction].filter(Boolean).join(" ");
-    const providerGuidance = {
-      chatgpt: "Produce the requested result directly and verify it against every stated constraint.",
-      claude: "Use evidence, separate uncertainty from facts, and make small reversible coding changes.",
-      gemini: "Use structured completion, report validation results, and generate requested media directly when supported.",
-      grok: "Follow direct instructions, keep within scope, and do not claim unavailable tools or repository access."
-    };
+  function serializePrompt(data) {
+    const type = getOutputType();
+    if (type === "json") return minifiedJson(promptData(data));
+    return RENDERERS[type][data.task](data);
+  }
 
-    if (getOutputType() === "json") {
-      return minifiedJson({ instruction, request: data, provider_guidance: providerGuidance[provider] });
+  const IMAGE_NOTE = "Generate the image now; return only the image, without rewriting the prompt or describing the result.";
+  const VIDEO_NOTE = "Generate the video now; return only the video, without rewriting the prompt or describing the result.";
+
+  // One line per provider, aimed at the padding that provider tends to add for that task.
+  const PROVIDER_NOTES = {
+    text: {
+      chatgpt: "No follow-up offers or questions unless required input is missing.",
+      claude: "Give one best answer rather than several alternatives unless asked.",
+      gemini: "No key-takeaways section or suggested next steps.",
+      grok: "Plain tone; no jokes or asides."
+    },
+    image: { chatgpt: IMAGE_NOTE, gemini: IMAGE_NOTE, grok: IMAGE_NOTE },
+    video: { gemini: VIDEO_NOTE, grok: VIDEO_NOTE },
+    coding_loop: {
+      chatgpt: "Run this bounded loop within its constraints; keep progress updates to one line.",
+      claude: "Run this bounded loop within its constraints; make small, reversible changes.",
+      gemini: "Run this bounded loop within its constraints; keep plans and walkthroughs brief.",
+      grok: "Run this bounded loop within its constraints; never claim tools or access you lack."
     }
-    return [
-      "# Instruction",
-      instruction,
-      "",
-      serializePrompt(data),
-      "",
-      "## Provider Guidance",
-      providerGuidance[provider]
-    ].join("\n");
+  };
+
+  function providerPrompt(provider, data) {
+    const note = PROVIDER_NOTES[data.task]?.[provider];
+    if (provider === "generic" || !note) return serializePrompt(data);
+    if (getOutputType() === "json") return minifiedJson({ instruction: note, request: promptData(data) });
+    return `${note}\n${serializePrompt(data)}`;
   }
 
   function closeGuardTooltips(exceptButton = null) {
@@ -910,8 +1025,7 @@
     context: "Include facts, constraints, and starting conditions that affect the answer.",
     mustInclude: "Add one required item per line.",
     mustAvoid: "Add one restriction or exclusion per line.",
-    temperature: "Choose a value from 0.1 to 0.9. Lower values are more consistent.",
-    maxTokens: "Use 0 to omit an output token limit.",
+    replyLength: "Caps the reply in words, which models follow more reliably than token counts. Every option also asks for no preamble or closing summary.",
     imageMode: "Choose Basic for a short brief or High Quality for detailed visual controls.",
     videoMode: "Choose Basic for a short brief or Cinematic for sequence-level controls.",
     vidBasicDuration: "Provide a duration greater than zero seconds.",
@@ -919,7 +1033,7 @@
     vidOutputDuration: "Provide the intended final duration in seconds, greater than zero.",
     vidFps: "Enter a whole frame rate between 1 and 240.",
     antiHallucinationGuard: "Prevents unsupported facts or sources, identifies unknowns, and labels assumptions. It cannot guarantee factual accuracy.",
-    stepLocking: "When on, adds category-specific steps to make the response sequence clear."
+    stepLocking: "When on, adds category-specific steps and asks the model to follow them without narrating them."
   };
 
   function addStaticFieldAssistance() {
@@ -947,7 +1061,7 @@
       error.className = "field-error";
       error.setAttribute("aria-live", "polite");
       outputFieldset.appendChild(error);
-      [elements.outputMarkdown, elements.outputJson].forEach(control => control.setAttribute("aria-describedby", `outputTypeHint ${error.id}`));
+      [elements.outputPlain, elements.outputMarkdown, elements.outputJson].forEach(control => control.setAttribute("aria-describedby", `outputTypeHint ${error.id}`));
     }
   }
 
@@ -1040,13 +1154,21 @@
     }
   }
 
-  function exactTokens(text) {
+  // Rough English average of four characters per token; the cards label every figure as an estimate.
+  function estimateTokens(text) {
     return Math.ceil(text.length / 4);
   }
 
-  function updateTokenMetrics(genericOutput, providerText) {
-    const genericTokens = exactTokens(genericOutput);
-    const providerTokens = exactTokens(providerText);
+  // Word caps convert at roughly 4 tokens per 3 words.
+  function replyBudget(data) {
+    if (data.task !== "text") return "n/a";
+    const words = numberValue("replyLength");
+    return words ? String(Math.ceil((words * 4) / 3)) : "No limit";
+  }
+
+  function updateTokenMetrics(genericOutput, providerText, data) {
+    const genericTokens = estimateTokens(genericOutput);
+    const providerTokens = estimateTokens(providerText);
     const overhead = Math.max(0, providerTokens - genericTokens);
     const ratio = genericTokens ? providerTokens / genericTokens : 0;
     const increase = genericTokens ? ((providerTokens - genericTokens) / genericTokens) * 100 : 0;
@@ -1055,7 +1177,14 @@
     elements.providerAdapterOverhead.textContent = String(overhead);
     elements.providerRatio.textContent = `${ratio.toFixed(2)}x`;
     elements.providerIncrease.textContent = `${Math.max(0, increase).toFixed(0)}%`;
+    elements.replyBudget.textContent = replyBudget(data);
   }
+
+  const OUTPUT_DESCRIPTIONS = {
+    plain: "Plain-text prompt ready for provider routing",
+    markdown: "Concise Markdown prompt ready for provider routing",
+    json: "Minified JSON prompt ready for provider routing"
+  };
 
   function generateOutput({ scroll = true } = {}) {
     if (!validateActiveForm({ focus: scroll })) return false;
@@ -1063,11 +1192,9 @@
     const serialized = serializePrompt(data);
     const providerText = providerPrompt(selectedProvider, data);
     elements.output.textContent = serialized;
-    elements.outputDescription.textContent = getOutputType() === "json"
-      ? "Minified JSON prompt ready for provider routing"
-      : "Concise Markdown prompt ready for provider routing";
+    elements.outputDescription.textContent = OUTPUT_DESCRIPTIONS[getOutputType()];
     elements.generatedPayloadSection.hidden = false;
-    updateTokenMetrics(serialized, providerText);
+    updateTokenMetrics(serialized, providerText, data);
     hasGeneratedOutput = true;
     if (scroll) elements.generatedPayloadSection.scrollIntoView({ behavior: "smooth", block: "start" });
     return true;
@@ -1081,6 +1208,7 @@
     [elements.genericTokens, elements.selectedProviderTokens, elements.providerAdapterOverhead].forEach(node => { node.textContent = "0"; });
     elements.providerRatio.textContent = "0.00x";
     elements.providerIncrease.textContent = "0%";
+    elements.replyBudget.textContent = "0";
   }
 
   function copyForProvider(provider) {
@@ -1093,7 +1221,7 @@
     const data = getFormData();
     const canonical = serializePrompt(data);
     const providerText = providerPrompt(provider, data);
-    updateTokenMetrics(canonical, providerText);
+    updateTokenMetrics(canonical, providerText, data);
     copyText(providerText);
   }
 
@@ -1149,7 +1277,7 @@
   }
 
   function cacheElements() {
-    ["promptType", "category", "antiHallucinationGuard", "stepLocking", "guardState", "stepLockState", "evidenceGuard", "evidenceGuardState", "outputMarkdown", "outputJson", "status", "generatedPayloadSection", "output", "outputDescription", "genericTokens", "selectedProviderTokens", "providerAdapterOverhead", "providerRatio", "providerIncrease", "copyChatGptBtn", "copyClaudeBtn", "copyGeminiBtn", "copyGrokBtn", "copyGenericBtn", "clearBtn", "copyToast", "codingFieldsMount"].forEach(id => {
+    ["promptType", "category", "antiHallucinationGuard", "stepLocking", "guardState", "stepLockState", "evidenceGuard", "evidenceGuardState", "outputPlain", "outputMarkdown", "outputJson", "status", "generatedPayloadSection", "output", "outputDescription", "genericTokens", "selectedProviderTokens", "providerAdapterOverhead", "providerRatio", "providerIncrease", "replyBudget", "copyChatGptBtn", "copyClaudeBtn", "copyGeminiBtn", "copyGrokBtn", "copyGenericBtn", "clearBtn", "copyToast", "codingFieldsMount"].forEach(id => {
       elements[id] = document.getElementById(id);
     });
   }
@@ -1192,6 +1320,7 @@
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") closeGuardTooltips();
     });
+    elements.outputPlain.addEventListener("change", handleOutputChoiceChange);
     elements.outputMarkdown.addEventListener("change", handleOutputChoiceChange);
     elements.outputJson.addEventListener("change", handleOutputChoiceChange);
     elements.copyChatGptBtn.addEventListener("click", () => copyForProvider("chatgpt"));

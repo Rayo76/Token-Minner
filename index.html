@@ -19,7 +19,7 @@
         <p class="eyebrow">Prompt Engineering Interface</p>
         <h1>Token Minner</h1>
         <p class="lede">
-          Fill in your parameters once and generate a structured Markdown/JSON prompt you can route to multiple LLM providers.
+          Fill in your parameters once and generate a structured plain-text, Markdown, or JSON prompt you can route to multiple LLM providers.
         </p>
         <p class="lede-benefits">
           Lesser Tokens -&gt; Targeted Outputs -&gt; Lower Costs -&gt; Lower Computing used -&gt; Better Planet
@@ -199,7 +199,7 @@
                     >i</button>
                   </span>
                   <span id="stepLockingTooltip" class="guard-tooltip" role="tooltip" hidden>
-                    Clear answers only, saves 40-60 % tokens
+                    Adds a short category-specific process and asks the model to follow it without narrating it.
                   </span>
                 </div>
                 <label class="switch" for="stepLocking">
@@ -211,31 +211,15 @@
             </div>
 
             <fieldset class="full settings">
-              <legend>Model Controls</legend>
+              <legend>Reply Controls</legend>
               <label>
-                Temperature
-                <input
-                  id="temperature"
-                  name="temperature"
-                  type="number"
-                  min="0.1"
-                  max="0.9"
-                  step="0.1"
-                  value="0.5"
-                />
-              </label>
-              <label>
-                Max tokens
-                <input
-                  id="maxTokens"
-                  name="maxTokens"
-                  type="number"
-                  min="0"
-                  max="1000"
-                  step="1"
-                  value="500"
-                />
-                <small class="field-hint">Use 0 for no token limit.</small>
+                Reply length
+                <select id="replyLength" name="replyLength">
+                  <option value="150">Brief (up to 150 words)</option>
+                  <option value="375" selected>Standard (up to 375 words)</option>
+                  <option value="900">Detailed (up to 900 words)</option>
+                  <option value="0">No limit</option>
+                </select>
               </label>
             </fieldset>
           </div>
@@ -485,7 +469,7 @@
                   Rule
                   <select id="imgRule" name="imgRule">
                     <option value="">Not specified</option>
-                    <option value="rule_of_thirds">rule_of_thirds</option>
+                    <option value="rule_of_thirds">rule of thirds</option>
                     <option value="centered">centered</option>
                     <option value="cinematic">cinematic</option>
                   </select>
@@ -829,13 +813,22 @@
           <fieldset class="full output-format-choice" aria-describedby="outputTypeHint">
             <legend>Prompt Output Type</legend>
             <div class="output-format-options">
+              <label class="check-option" for="outputPlain">
+                <input
+                  type="radio"
+                  id="outputPlain"
+                  name="promptOutputType"
+                  value="plain"
+                  checked
+                />
+                Plain Text
+              </label>
               <label class="check-option" for="outputMarkdown">
                 <input
                   type="radio"
                   id="outputMarkdown"
                   name="promptOutputType"
                   value="markdown"
-                  checked
                 />
                 Concise Markdown
               </label>
@@ -850,7 +843,7 @@
               </label>
             </div>
             <small id="outputTypeHint" class="field-hint">
-              Select one format. JSON prompts are generated as minified JSON.
+              Select one format. Plain Text uses the fewest tokens; JSON is minified.
             </small>
           </fieldset>
 
@@ -871,11 +864,12 @@
         </div>
         <pre id="output" class="output-box">{}</pre>
         <div id="tokenMetrics" class="token-metrics" aria-live="polite">
-          <div><span>Generic Output Tokens</span><strong id="genericTokens">0</strong></div>
-          <div><span>Selected Provider Output Tokens</span><strong id="selectedProviderTokens">0</strong></div>
+          <div><span>Generic Prompt Tokens (est.)</span><strong id="genericTokens">0</strong></div>
+          <div><span>Selected Provider Prompt Tokens (est.)</span><strong id="selectedProviderTokens">0</strong></div>
           <div><span>Provider Adapter Overhead</span><strong id="providerAdapterOverhead">0</strong></div>
           <div><span>Provider-to-Generic Ratio</span><strong id="providerRatio">0.00x</strong></div>
           <div><span>Percentage Increase</span><strong id="providerIncrease">0%</strong></div>
+          <div><span>Reply Budget (est. tokens)</span><strong id="replyBudget">0</strong></div>
         </div>
         <div class="output-actions">
           <button type="button" id="copyChatGptBtn" class="copy-provider-btn">
@@ -899,6 +893,6 @@
 
     <div id="copyToast" class="copy-toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=20260719-2" defer></script>
+    <script src="./app.js?v=20260919-1" defer></script>
   </body>
 </html>
