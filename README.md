@@ -24,7 +24,7 @@ There is no raw-prompt detection, conversion, autofill, edit-source tracking, or
 ## Output Format
 
 - **Plain Text** (default) writes one `Label: value` line per field, joins lists with semicolons, and uses no markup. It uses the fewest tokens.
-- **Concise Markdown** uses readable task-specific headings and labels.
+- **Concise Markdown** uses readable task-specific headings and labels. Coding Loop renders all sections including Planning, which previous versions omitted.
 - **JSON** is always minified with `JSON.stringify`.
 - Every format omits empty values, empty lists, optional selects left as `Not specified`, the `Other` category, and screen-only settings such as Basic/Advanced mode.
 - Dropdown choices are sent as their readable labels, for example `Before risky actions` rather than `before_risky_actions`.
