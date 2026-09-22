@@ -722,6 +722,58 @@
     });
   }
 
+  const IMAGE_CATEGORY_TEMPLATES = {
+    "Photo / Realistic": { subject: "Golden retriever wearing pilot goggles", style: "photorealistic, natural light", scene: "sunset beach with flying sand" },
+    "Illustration / Art": { subject: "Fox reading a book by candlelight", style: "watercolor illustration, soft edges", scene: "cozy forest cabin interior" },
+    "Logo / Icon": { subject: "Minimalist mountain peak mark", style: "flat vector, two-color", scene: "plain white background" },
+    "Product Shot": { subject: "Ceramic coffee mug with steam", style: "studio product photography", scene: "seamless gradient backdrop" },
+    "Poster / Social Graphic": { subject: "Bold headline over a concert crowd", style: "high-contrast graphic design", scene: "stage lights and haze" },
+    "Infographic / Diagram": { subject: "Three-step onboarding flow", style: "clean flat infographic", scene: "labeled arrows and icons" },
+    "UI / App Mockup": { subject: "Mobile dashboard screen", style: "modern flat UI design", scene: "phone frame on neutral background" },
+    "Character / Sticker": { subject: "Cheerful cartoon otter mascot", style: "sticker-style vector art, bold outline", scene: "transparent background" },
+    "Image Edit": { subject: "Existing photo with the sky replaced", style: "match original lighting and grain", scene: "unchanged foreground subject" }
+  };
+
+  const IMAGE_VIDEO_CATEGORY_FIELD_IDS = ["imgBasicSubject", "imgHqSubject", "imgBasicStyle", "imgHqStyle", "imgBasicScene", "imgHqScene", "vidBasicSubject", "vidSubject", "vidBasicScene", "vidScene"];
+
+  // Capture each field's HTML-authored placeholder once, before any category ever overwrites it,
+  // so switching back to "Not specified" restores the original rather than the last category's text.
+  function captureDefaultPlaceholders() {
+    IMAGE_VIDEO_CATEGORY_FIELD_IDS.forEach(id => {
+      const control = document.getElementById(id);
+      if (control && control.dataset.defaultPlaceholder === undefined) control.dataset.defaultPlaceholder = control.placeholder;
+    });
+  }
+
+  function applyImageCategoryPlaceholders() {
+    const template = IMAGE_CATEGORY_TEMPLATES[value("imageCategory")];
+    [["imgBasicSubject", "subject"], ["imgHqSubject", "subject"], ["imgBasicStyle", "style"], ["imgHqStyle", "style"], ["imgBasicScene", "scene"], ["imgHqScene", "scene"]].forEach(([id, key]) => {
+      const control = document.getElementById(id);
+      if (control) control.placeholder = template ? template[key] : control.dataset.defaultPlaceholder;
+    });
+  }
+
+  const VIDEO_CATEGORY_TEMPLATES = {
+    "Cinematic Scene": { subject: "Lone rider crossing a canyon", scene: "dusk, wide desert vista", tip: "" },
+    "Product Ad": { subject: "Watch rotating on a pedestal", scene: "studio backdrop with rim light", tip: "" },
+    "Social Short (vertical)": { subject: "Creator holding up a product", scene: "bright indoor setting", tip: "Vertical 9:16 framing suits most social platforms." },
+    "Explainer / Animation": { subject: "Animated arrow tracing a workflow", scene: "flat-design animated background", tip: "" },
+    "Talking Head / UGC": { subject: "Presenter speaking to camera", scene: "casual indoor setting, natural light", tip: "" },
+    "Music Video": { subject: "Band performing on stage", scene: "concert lighting and haze", tip: "" },
+    "Seamless Loop": { subject: "Rotating abstract pattern", scene: "looping background motion", tip: "Ensure the first and last frame match for a clean loop." },
+    "Animate an Image": { subject: "Subtle motion added to a still photo", scene: "same framing as the source image", tip: "Describe only the motion to add; the source image sets the composition." }
+  };
+
+  function applyVideoCategoryPlaceholders() {
+    const template = VIDEO_CATEGORY_TEMPLATES[value("videoCategory")];
+    [["vidBasicSubject", "subject"], ["vidSubject", "subject"], ["vidBasicScene", "scene"], ["vidScene", "scene"]].forEach(([id, key]) => {
+      const control = document.getElementById(id);
+      if (control) control.placeholder = template ? template[key] : control.dataset.defaultPlaceholder;
+    });
+    const categoryTip = document.getElementById("videoCategory-tip");
+    if (categoryTip) categoryTip.textContent = (template && template.tip) || categoryTip.dataset.baseTip || "Choose a category to receive relevant in-field examples without changing your entries.";
+  }
+
   function applyCodingCategoryGuidance() {
     const category = document.getElementById("codingCategory").value;
     const template = CODING_CATEGORY_TEMPLATES[category] || CODING_CATEGORY_TEMPLATES.Other;
@@ -977,12 +1029,22 @@
     const type = elements.promptType.value;
     if (type === "coding") return buildCodingData();
     if (type === "image") {
-      if (value("imageMode") === "basic") return pruneEmpty({ task: "image", mode: "basic", subj: value("imgBasicSubject"), style: value("imgBasicStyle"), scene: value("imgBasicScene"), visual: { lighting: value("imgBasicLighting") }, comp: { description: value("imgBasicComposition") } });
-      return pruneEmpty({ task: "image", mode: "high", subj: { name: value("imgHqSubject"), type: value("imgSubjectType"), details: value("imgSubjectDetails"), action: value("imgSubjectAction") }, scene: { description: value("imgHqScene"), location: value("imgLocation"), environment: value("imgEnvironment"), time: value("imgTimeOfDay"), weather: value("imgWeather") }, style: { description: value("imgHqStyle"), genre: value("imgGenre"), inspiration: value("imgInspiration"), realism: value("imgRealism"), mood: value("imgMood") }, visual: { lighting: value("imgLighting"), palette: value("imgColourPalette"), contrast: value("imgContrast"), textures: value("imgTextures") }, cam: { angle: value("imgAngle"), lens: value("imgLens"), dof: value("imgDepthOfField"), focus: value("imgFocus") }, comp: { description: value("imgHqComposition"), framing: value("imgFraming"), rule: choice("imgRule"), motion: value("imgMotion") }, out: { resolution: value("imgResolution"), ratio: value("imgAspectRatio"), quality: value("imgQuality") }, constraints: { negative: value("imgNegativePrompt"), avoid: lines("imgAvoid") } });
+      const imageShared = {
+        cat: categoryValue("imageCategory"),
+        extra: { text: lines("imgTextToRender"), background: choice("imgBackground"), variations: value("imgVariations"), change: lines("imgWhatToChange"), keep: lines("imgWhatToKeep") },
+        ref: attachedFiles.imgReferenceFile ? `attached image "${attachedFiles.imgReferenceFile.name}"` : ""
+      };
+      if (value("imageMode") === "basic") return pruneEmpty({ task: "image", mode: "basic", ...imageShared, subj: value("imgBasicSubject"), style: value("imgBasicStyle"), scene: value("imgBasicScene"), visual: { lighting: value("imgBasicLighting") }, comp: { description: value("imgBasicComposition") } });
+      return pruneEmpty({ task: "image", mode: "high", ...imageShared, subj: { name: value("imgHqSubject"), type: value("imgSubjectType"), details: value("imgSubjectDetails"), action: value("imgSubjectAction") }, scene: { description: value("imgHqScene"), location: value("imgLocation"), environment: value("imgEnvironment"), time: value("imgTimeOfDay"), weather: value("imgWeather") }, style: { description: value("imgHqStyle"), genre: value("imgGenre"), inspiration: value("imgInspiration"), realism: value("imgRealism"), mood: value("imgMood") }, visual: { lighting: value("imgLighting"), palette: value("imgColourPalette"), contrast: value("imgContrast"), textures: value("imgTextures") }, cam: { angle: value("imgAngle"), lens: value("imgLens"), dof: value("imgDepthOfField"), focus: value("imgFocus") }, comp: { description: value("imgHqComposition"), framing: value("imgFraming"), rule: choice("imgRule"), motion: value("imgMotion") }, out: { resolution: value("imgResolution"), ratio: value("imgAspectRatio"), quality: value("imgQuality") }, constraints: { negative: value("imgNegativePrompt"), avoid: lines("imgAvoid") } });
     }
     if (type === "video") {
-      if (value("videoMode") === "basic") return pruneEmpty({ task: "video", mode: "basic", subj: value("vidBasicSubject"), style: value("vidBasicStyle"), scene: value("vidBasicScene"), duration: numberValue("vidBasicDuration"), cam: value("vidBasicCamera") });
-      return pruneEmpty({ task: "video", mode: "cinematic", subj: { name: value("vidSubject"), type: value("vidType"), details: value("vidDetails"), action: value("vidAction") }, scene: { description: value("vidScene"), location: value("vidLocation"), environment: value("vidEnvironment"), time: value("vidTimeOfDay"), weather: value("vidWeather") }, seq: { shot: value("vidShot"), action: value("vidSequenceAction"), duration: numberValue("vidSequenceDuration") }, cam: { movement: value("vidMovement"), angle: value("vidAngle"), lens: value("vidLens"), stabilization: value("vidStabilization") }, style: { genre: value("vidGenre"), mood: value("vidMood"), realism: value("vidRealism"), reference: value("vidReference") }, visual: { lighting: value("vidLighting"), grading: value("vidColorGrading"), effects: value("vidEffects") }, audio: { music: value("vidMusic"), sfx: value("vidSfx"), voiceover: value("vidVoiceover") }, out: { duration: numberValue("vidOutputDuration"), resolution: value("vidResolution"), fps: numberValue("vidFps"), ratio: value("vidAspectRatio") }, constraints: { negative: value("vidNegativePrompt"), avoid: lines("vidAvoid") } });
+      const videoShared = {
+        cat: categoryValue("videoCategory"),
+        sound: { audio: choice("vidAudioOption"), dialogue: lines("vidDialogue"), ambient: value("vidAmbientSound"), text: value("vidOnScreenText") },
+        start: attachedFiles.vidStartFrameFile ? `attached image "${attachedFiles.vidStartFrameFile.name}"` : ""
+      };
+      if (value("videoMode") === "basic") return pruneEmpty({ task: "video", mode: "basic", ...videoShared, subj: value("vidBasicSubject"), style: value("vidBasicStyle"), scene: value("vidBasicScene"), duration: numberValue("vidBasicDuration"), cam: value("vidBasicCamera") });
+      return pruneEmpty({ task: "video", mode: "cinematic", ...videoShared, subj: { name: value("vidSubject"), type: value("vidType"), details: value("vidDetails"), action: value("vidAction") }, scene: { description: value("vidScene"), location: value("vidLocation"), environment: value("vidEnvironment"), time: value("vidTimeOfDay"), weather: value("vidWeather") }, seq: { shot: value("vidShot"), action: value("vidSequenceAction"), duration: numberValue("vidSequenceDuration") }, cam: { movement: value("vidMovement"), angle: value("vidAngle"), lens: value("vidLens"), stabilization: value("vidStabilization") }, style: { genre: value("vidGenre"), mood: value("vidMood"), realism: value("vidRealism"), reference: value("vidReference") }, visual: { lighting: value("vidLighting"), grading: value("vidColorGrading"), effects: value("vidEffects") }, audio: { music: value("vidMusic"), sfx: value("vidSfx"), voiceover: value("vidVoiceover") }, out: { duration: numberValue("vidOutputDuration"), resolution: value("vidResolution"), fps: numberValue("vidFps"), ratio: value("vidAspectRatio") }, constraints: { negative: value("vidNegativePrompt"), avoid: lines("vidAvoid") } });
     }
     if (type === "ppt") {
       const slideCount = numberValue("pptSlideCount");
@@ -1173,8 +1235,12 @@
     return output.join("\n");
   }
 
+  const IMAGE_EXTRA_LABELS = { text: "Text to render", background: "Background", variations: "Variations", change: "What to change", keep: "What to keep unchanged" };
+  const VIDEO_SOUND_LABELS = { audio: "Audio", dialogue: "Dialogue", ambient: "Ambient sound", text: "On-screen text" };
+
   function renderImageMarkdown(data) {
     const output = ["# Image Generation"];
+    addMarkdownValue(output, "Category", data.cat);
     if (data.mode === "basic") {
       [["Subject", data.subj], ["Style", data.style], ["Scene", data.scene]].forEach(([label, item]) => addMarkdownValue(output, label, item));
       addMarkdownSection(output, "Visual", data.visual, { lighting: "Lighting" });
@@ -1182,36 +1248,47 @@
     } else {
       IMAGE_HQ_SECTIONS.forEach(([label, key, labels]) => addMarkdownSection(output, label, data[key], labels));
     }
+    addMarkdownSection(output, "Additional", data.extra, IMAGE_EXTRA_LABELS);
+    addMarkdownValue(output, "Reference", data.ref);
     return output.join("\n");
   }
 
   function renderImagePlain(data) {
     const output = ["Image generation"];
+    addPlainValue(output, "Category", data.cat);
     if (data.mode === "basic") {
       [["Subject", data.subj], ["Style", data.style], ["Scene", data.scene], ["Lighting", data.visual?.lighting], ["Composition", data.comp?.description]].forEach(([label, item]) => addPlainValue(output, label, item));
     } else {
       IMAGE_HQ_SECTIONS.forEach(([label, key, labels]) => addPlainSection(output, label, data[key], labels));
     }
+    addPlainSection(output, "Additional", data.extra, IMAGE_EXTRA_LABELS);
+    addPlainValue(output, "Reference", data.ref);
     return output.join("\n");
   }
 
   function renderVideoMarkdown(data) {
     const output = ["# Video Generation"];
+    addMarkdownValue(output, "Category", data.cat);
     if (data.mode === "basic") {
       VIDEO_BASIC_FIELDS.forEach(([label, key]) => addMarkdownValue(output, label, data[key]));
     } else {
       VIDEO_CINEMATIC_SECTIONS.forEach(([label, key, labels]) => addMarkdownSection(output, label, data[key], labels));
     }
+    addMarkdownSection(output, "Audio and Text", data.sound, VIDEO_SOUND_LABELS);
+    addMarkdownValue(output, "Start Frame", data.start);
     return output.join("\n");
   }
 
   function renderVideoPlain(data) {
     const output = ["Video generation"];
+    addPlainValue(output, "Category", data.cat);
     if (data.mode === "basic") {
       VIDEO_BASIC_FIELDS.forEach(([label, key]) => addPlainValue(output, label, data[key]));
     } else {
       VIDEO_CINEMATIC_SECTIONS.forEach(([label, key, labels]) => addPlainSection(output, label, data[key], labels));
     }
+    addPlainSection(output, "Audio and Text", data.sound, VIDEO_SOUND_LABELS);
+    addPlainValue(output, "Start Frame", data.start);
     return output.join("\n");
   }
 
@@ -1347,7 +1424,13 @@
     mustAvoid: "Add one restriction or exclusion per line.",
     replyLength: "Caps the reply in words, which models follow more reliably than token counts. Every option also asks for no preamble or closing summary.",
     imageMode: "Choose Basic for a short brief or High Quality for detailed visual controls.",
+    imageCategory: "Choose a category to receive relevant in-field examples without changing your entries.",
+    imgTextToRender: "One text block per line; only use this when the image should contain readable text.",
+    imgWhatToChange: "List only what should change, one item per line.",
+    imgWhatToKeep: "List only what should stay the same, one item per line.",
     videoMode: "Choose Basic for a short brief or Cinematic for sequence-level controls.",
+    videoCategory: "Choose a category to receive relevant in-field examples without changing your entries.",
+    vidDialogue: "One \"Speaker: line\" per line.",
     vidBasicDuration: "Provide a duration greater than zero seconds.",
     vidSequenceDuration: "Provide the sequence duration in seconds, greater than zero.",
     vidOutputDuration: "Provide the intended final duration in seconds, greater than zero.",
@@ -1578,6 +1661,10 @@
     updateModeVisibility();
     Object.keys(attachedFiles).forEach(key => { attachedFiles[key] = null; });
     renderFileChip("pptSourceFile-chip", "pptSourceFile", "pptSourceFile");
+    renderFileChip("imgReferenceFile-chip", "imgReferenceFile", "imgReferenceFile");
+    renderFileChip("vidStartFrameFile-chip", "vidStartFrameFile", "vidStartFrameFile");
+    applyImageCategoryPlaceholders();
+    applyVideoCategoryPlaceholders();
     updatePptWordsVisibility();
     updatePptSlideCountTip();
     switchTab("text");
@@ -1635,6 +1722,10 @@
     elements.category.addEventListener("change", () => window.setTimeout(() => { applyTextCategoryPlaceholders(); scheduleOutputRefresh(); }, 0));
     document.getElementById("imageMode").addEventListener("change", () => { updateModeVisibility(); refreshAfterTaskChange(); });
     document.getElementById("videoMode").addEventListener("change", () => { updateModeVisibility(); refreshAfterTaskChange(); });
+    document.getElementById("imageCategory").addEventListener("change", () => window.setTimeout(() => { applyImageCategoryPlaceholders(); scheduleOutputRefresh(); }, 0));
+    document.getElementById("videoCategory").addEventListener("change", () => window.setTimeout(() => { applyVideoCategoryPlaceholders(); scheduleOutputRefresh(); }, 0));
+    setupFileInput("imgReferenceFile", IMAGE_REFERENCE_EXTENSIONS, "imgReferenceFile", "imgReferenceFile-chip");
+    setupFileInput("vidStartFrameFile", VIDEO_START_FRAME_EXTENSIONS, "vidStartFrameFile", "vidStartFrameFile-chip");
     document.getElementById("codingMode").addEventListener("change", () => { updateModeVisibility(); refreshAfterTaskChange(); });
     document.getElementById("codingCategory").addEventListener("change", () => window.setTimeout(() => { applyCodingCategoryGuidance(); scheduleOutputRefresh(); }, 0));
     document.getElementById("iterationWorkflow").addEventListener("input", () => { workflowManaged = false; });
@@ -1688,9 +1779,12 @@
     cacheElements();
     initializeExistingLimits();
     addStaticFieldAssistance();
+    captureDefaultPlaceholders();
     bindEvents();
     applyTextCategoryPlaceholders();
     applyCodingCategoryGuidance();
+    applyImageCategoryPlaceholders();
+    applyVideoCategoryPlaceholders();
     updateModeVisibility();
     switchTab("text");
   }

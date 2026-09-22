@@ -246,6 +246,22 @@
               </select>
             </label>
 
+            <label class="full">
+              Category
+              <select id="imageCategory" name="imageCategory">
+                <option value="">Not specified</option>
+                <option value="Photo / Realistic">Photo / Realistic</option>
+                <option value="Illustration / Art">Illustration / Art</option>
+                <option value="Logo / Icon">Logo / Icon</option>
+                <option value="Product Shot">Product Shot</option>
+                <option value="Poster / Social Graphic">Poster / Social Graphic</option>
+                <option value="Infographic / Diagram">Infographic / Diagram</option>
+                <option value="UI / App Mockup">UI / App Mockup</option>
+                <option value="Character / Sticker">Character / Sticker</option>
+                <option value="Image Edit">Image Edit</option>
+              </select>
+            </label>
+
             <div id="imageBasicFields" class="full mode-section">
               <label>
                 Subject
@@ -535,6 +551,62 @@
                 </label>
               </div>
             </div>
+
+            <div class="section-group full">
+              <h3>Additional Controls</h3>
+              <label class="full">
+                Text to Render
+                <textarea
+                  id="imgTextToRender"
+                  name="imgTextToRender"
+                  rows="2"
+                  placeholder="One text block per line, e.g. a headline or logo wordmark"
+                ></textarea>
+              </label>
+              <label>
+                Background
+                <select id="imgBackground" name="imgBackground">
+                  <option value="">Not specified</option>
+                  <option value="scene">Scene</option>
+                  <option value="solid_colour">Solid colour</option>
+                  <option value="transparent">Transparent</option>
+                </select>
+              </label>
+              <label>
+                Variations
+                <select id="imgVariations" name="imgVariations">
+                  <option value="">Not specified</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+              </label>
+              <label>
+                What to Change
+                <textarea
+                  id="imgWhatToChange"
+                  name="imgWhatToChange"
+                  rows="2"
+                  placeholder="One change per line"
+                ></textarea>
+              </label>
+              <label>
+                What to Keep Unchanged
+                <textarea
+                  id="imgWhatToKeep"
+                  name="imgWhatToKeep"
+                  rows="2"
+                  placeholder="One item per line"
+                ></textarea>
+              </label>
+              <label class="full">
+                Select reference image
+                <input id="imgReferenceFile" name="imgReferenceFile" type="file" accept=".png,.jpg,.jpeg,.webp" />
+                <small class="field-hint">PNG, JPG, or WEBP. Only the file name is used. The file is never read, uploaded or stored. Attach the same file in your AI chat.</small>
+                <div id="imgReferenceFile-chip" class="file-chip-host"></div>
+              </label>
+            </div>
           </div>
 
           <div id="videoFields" class="full interface-section" role="tabpanel" aria-labelledby="videoTab" hidden>
@@ -543,6 +615,21 @@
               <select id="videoMode" name="videoMode">
                 <option value="basic">Basic</option>
                 <option value="cinematic">Cinematic</option>
+              </select>
+            </label>
+
+            <label class="full">
+              Category
+              <select id="videoCategory" name="videoCategory">
+                <option value="">Not specified</option>
+                <option value="Cinematic Scene">Cinematic Scene</option>
+                <option value="Product Ad">Product Ad</option>
+                <option value="Social Short (vertical)">Social Short (vertical)</option>
+                <option value="Explainer / Animation">Explainer / Animation</option>
+                <option value="Talking Head / UGC">Talking Head / UGC</option>
+                <option value="Music Video">Music Video</option>
+                <option value="Seamless Loop">Seamless Loop</option>
+                <option value="Animate an Image">Animate an Image</option>
               </select>
             </label>
 
@@ -816,6 +903,43 @@
                   ></textarea>
                 </label>
               </div>
+            </div>
+
+            <div class="section-group full">
+              <h3>Audio and Text</h3>
+              <label>
+                Audio
+                <select id="vidAudioOption" name="vidAudioOption">
+                  <option value="">Not specified</option>
+                  <option value="dialogue_and_sound">Dialogue and sound</option>
+                  <option value="sfx_and_ambient_only">Sound effects and ambient only</option>
+                  <option value="music_only">Music only</option>
+                  <option value="no_audio">No audio</option>
+                </select>
+              </label>
+              <label class="full">
+                Dialogue
+                <textarea
+                  id="vidDialogue"
+                  name="vidDialogue"
+                  rows="2"
+                  placeholder="One &quot;Speaker: line&quot; per line"
+                ></textarea>
+              </label>
+              <label>
+                Ambient Sound
+                <input id="vidAmbientSound" name="vidAmbientSound" type="text" placeholder="rain, distant traffic" />
+              </label>
+              <label>
+                On-screen Text / Captions
+                <input id="vidOnScreenText" name="vidOnScreenText" type="text" placeholder="Lower-third captions" />
+              </label>
+              <label class="full">
+                Select start frame
+                <input id="vidStartFrameFile" name="vidStartFrameFile" type="file" accept=".png,.jpg,.jpeg,.webp" />
+                <small class="field-hint">PNG, JPG, or WEBP. Only the file name is used. The file is never read, uploaded or stored. Attach the same file in your AI chat.</small>
+                <div id="vidStartFrameFile-chip" class="file-chip-host"></div>
+              </label>
             </div>
           </div>
 
