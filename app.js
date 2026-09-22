@@ -172,14 +172,66 @@
     return s;
   }
 
-  // Extract extension and validate against allowed list
-  function getFileType(filename, allowedExtensions) {
+  // Extract the extension from the LAST segment of the sanitised name and check it
+  // case-insensitively against an {ext: label} map. The accept attribute is only a hint;
+  // this is the actual gate. Rejects extensionless names and anything not on the list.
+  function getFileType(filename, extensionLabels) {
     const sanitized = sanitizeFilename(filename);
     if (!sanitized) return null;
     const parts = sanitized.split(".");
     if (parts.length < 2) return null;
     const ext = "." + parts[parts.length - 1].toLowerCase();
-    return allowedExtensions.includes(ext) ? { name: sanitized, ext, type: allowedExtensions.indexOf(ext) } : null;
+    return Object.prototype.hasOwnProperty.call(extensionLabels, ext) ? { name: sanitized, ext, label: extensionLabels[ext] } : null;
+  }
+
+  const PPT_SOURCE_EXTENSIONS = { ".docx": "Word", ".doc": "Word", ".xlsx": "Excel", ".xls": "Excel", ".pdf": "PDF", ".md": "Markdown" };
+  const IMAGE_REFERENCE_EXTENSIONS = { ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image" };
+  const VIDEO_START_FRAME_EXTENSIONS = { ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image" };
+
+  // Closure-scoped store for attached filenames only. Never exposed on window;
+  // the file itself is never read, so there is nothing else to hold.
+  const attachedFiles = { pptSourceFile: null, imgReferenceFile: null, vidStartFrameFile: null };
+
+  function renderFileChip(chipHostId, storeKey, inputId) {
+    const host = document.getElementById(chipHostId);
+    if (!host) return;
+    host.replaceChildren();
+    const file = attachedFiles[storeKey];
+    if (!file) return;
+    const chip = document.createElement("span");
+    chip.className = "file-chip";
+    chip.appendChild(document.createTextNode(`${file.label}: ${file.name}`));
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "file-chip-remove";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      attachedFiles[storeKey] = null;
+      renderFileChip(chipHostId, storeKey, inputId);
+      scheduleOutputRefresh();
+    });
+    chip.appendChild(removeBtn);
+    host.appendChild(chip);
+  }
+
+  function setupFileInput(inputId, extensionLabels, storeKey, chipHostId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener("change", () => {
+      const picked = input.files && input.files[0];
+      input.value = ""; // release the file from memory immediately, whether accepted or not
+      if (!picked) return;
+      const file = getFileType(picked.name, extensionLabels);
+      if (!file) {
+        setError(input, `Unsupported file type. Allowed: ${Object.keys(extensionLabels).join(", ")}.`);
+        return;
+      }
+      setError(input, "");
+      attachedFiles[storeKey] = file;
+      renderFileChip(chipHostId, storeKey, inputId);
+      showToast("Using the file name only. The file was not read or stored, and it has been released. Attach it in your AI chat.");
+      scheduleOutputRefresh();
+    });
   }
 
   const CODING_BASIC_GROUPS = [
@@ -410,12 +462,16 @@
         field("pptWordsPerSlide", "Words per Slide or Bullets", "choose a word limit or bullet count.", {
           type: "select",
           defaultValue: "40_words",
-          choices: [
-            ["20_words", "Up to 20 words"], ["25_words", "Up to 25 words"], ["40_words", "Up to 40 words"],
-            ["50_words", "Up to 50 words"], ["60_words", "Up to 60 words"], ["75_words", "Up to 75 words"],
-            ["3_bullets", "Up to 3 bullets"], ["4_bullets", "Up to 4 bullets"], ["5_bullets", "Up to 5 bullets"],
-            ["custom_words", "Custom word count"]
-          ]
+          optgroups: [
+            ["Words", [
+              ["20_words", "Up to 20 words"], ["25_words", "Up to 25 words"], ["40_words", "Up to 40 words"],
+              ["50_words", "Up to 50 words"], ["60_words", "Up to 60 words"], ["75_words", "Up to 75 words"]
+            ]],
+            ["Bullets", [
+              ["3_bullets", "Up to 3 bullets"], ["4_bullets", "Up to 4 bullets"], ["5_bullets", "Up to 5 bullets"]
+            ]]
+          ],
+          choices: [["custom_words", "Custom word count"]]
         }),
         field("pptCustomWords", "Custom Word Count", "enter a word limit from 10 to 150 (visible only when Custom is selected).", {
           type: "number",
@@ -468,12 +524,21 @@
       control.maxLength = 5000;
     } else if (config.type === "select") {
       control = document.createElement("select");
-      config.choices.forEach(([value, text]) => {
+      const addOption = ([value, text]) => {
         const option = document.createElement("option");
         option.value = value;
         option.textContent = text;
-        control.appendChild(option);
-      });
+        return option;
+      };
+      if (config.optgroups) {
+        config.optgroups.forEach(([groupLabel, groupChoices]) => {
+          const group = document.createElement("optgroup");
+          group.label = groupLabel;
+          groupChoices.forEach(pair => group.appendChild(addOption(pair)));
+          control.appendChild(group);
+        });
+      }
+      (config.choices || []).forEach(pair => control.appendChild(addOption(pair)));
     } else {
       control = document.createElement("input");
       control.type = config.type || "text";
@@ -531,6 +596,57 @@
     section.appendChild(heading);
     group.fields.forEach(config => section.appendChild(createField(config)));
     return section;
+  }
+
+  function renderPptFields() {
+    const container = document.createDocumentFragment();
+    PPT_FIELDS.forEach(group => {
+      const section = document.createElement("div");
+      section.className = "section-group";
+      const heading = document.createElement("h3");
+      heading.textContent = group.title;
+      section.appendChild(heading);
+      group.fields.forEach(config => {
+        const el = createField(config);
+        section.appendChild(el);
+        if (config.fileInput) {
+          const chipHost = document.createElement("div");
+          chipHost.id = `${config.id}-chip`;
+          chipHost.className = "file-chip-host";
+          el.appendChild(chipHost);
+          const helper = document.createElement("small");
+          helper.className = "field-hint";
+          helper.textContent = "The file is never read, uploaded or stored. Attach the same file in your AI chat.";
+          el.appendChild(helper);
+        }
+      });
+      container.appendChild(section);
+    });
+    elements.pptFieldsMount.replaceChildren(container);
+    document.querySelectorAll("#pptFieldsMount .coding-tip").forEach(tip => { tip.textContent = tip.dataset.baseTip; });
+    setupFileInput("pptSourceFile", PPT_SOURCE_EXTENSIONS, "pptSourceFile", "pptSourceFile-chip");
+    document.getElementById("pptWordsPerSlide").addEventListener("change", updatePptWordsVisibility);
+    document.getElementById("pptSlideCount").addEventListener("change", updatePptSlideCountTip);
+    updatePptWordsVisibility();
+    updatePptSlideCountTip();
+  }
+
+  function updatePptWordsVisibility() {
+    const isCustom = value("pptWordsPerSlide") === "custom_words";
+    const customField = document.getElementById("pptCustomWords")?.closest("label");
+    if (customField) customField.hidden = !isCustom;
+    if (!isCustom) setError(document.getElementById("pptCustomWords"), "");
+  }
+
+  // Unlimited is a warning, not a blocking error: generate must still work, so this
+  // swaps the tip text directly instead of going through setError.
+  function updatePptSlideCountTip() {
+    const tip = document.getElementById("pptSlideCount-tip");
+    if (!tip) return;
+    const isUnlimited = value("pptSlideCount") === "0";
+    tip.textContent = isUnlimited
+      ? "No slide cap. The reply and its token use are unbounded."
+      : tip.dataset.baseTip;
   }
 
   function renderCodingFields() {
@@ -641,7 +757,7 @@
       coding: { chatgpt: "Copy for Codex", claude: "Copy for Claude Code", gemini: "Copy for Google Antigravity", grok: "Copy for Grok Build", generic: "Copy Generic Loop" },
       ppt: { chatgpt: "Copy for ChatGPT", claude: "Copy for Claude", gemini: "Copy for Gemini", grok: "Copy for Grok", copilot: "Copy for Microsoft Copilot", generic: "Copy Generic" }
     };
-    const buttons = { chatgpt: elements.copyChatGptBtn, claude: elements.copyClaudeBtn, gemini: elements.copyGeminiBtn, grok: elements.copyGrokBtn, generic: elements.copyGenericBtn };
+    const buttons = { chatgpt: elements.copyChatGptBtn, claude: elements.copyClaudeBtn, gemini: elements.copyGeminiBtn, grok: elements.copyGrokBtn, copilot: elements.copyCopilotBtn, generic: elements.copyGenericBtn };
     Object.entries(buttons).forEach(([provider, button]) => {
       const label = buttonLabels[type][provider];
       button.hidden = !label;
@@ -688,6 +804,22 @@
   function numberValue(id) {
     const raw = value(id);
     return raw === "" ? "" : Number(raw);
+  }
+
+  function checked(id) {
+    return Boolean(document.getElementById(id)?.checked);
+  }
+
+  // Reads the Words per Slide select into a compact {unit, max} pair for both
+  // display and JSON. Returns undefined when Custom is selected but empty/invalid.
+  function pptPerSlide() {
+    const selected = value("pptWordsPerSlide");
+    if (selected === "custom_words") {
+      const n = numberValue("pptCustomWords");
+      return Number.isInteger(n) && n >= 10 && n <= 150 ? { unit: "words", max: n } : undefined;
+    }
+    const match = /^(\d+)_(words|bullets)$/.exec(selected);
+    return match ? { unit: match[2], max: Number(match[1]) } : undefined;
   }
 
   function pruneEmpty(input) {
@@ -851,6 +983,29 @@
     if (type === "video") {
       if (value("videoMode") === "basic") return pruneEmpty({ task: "video", mode: "basic", subj: value("vidBasicSubject"), style: value("vidBasicStyle"), scene: value("vidBasicScene"), duration: numberValue("vidBasicDuration"), cam: value("vidBasicCamera") });
       return pruneEmpty({ task: "video", mode: "cinematic", subj: { name: value("vidSubject"), type: value("vidType"), details: value("vidDetails"), action: value("vidAction") }, scene: { description: value("vidScene"), location: value("vidLocation"), environment: value("vidEnvironment"), time: value("vidTimeOfDay"), weather: value("vidWeather") }, seq: { shot: value("vidShot"), action: value("vidSequenceAction"), duration: numberValue("vidSequenceDuration") }, cam: { movement: value("vidMovement"), angle: value("vidAngle"), lens: value("vidLens"), stabilization: value("vidStabilization") }, style: { genre: value("vidGenre"), mood: value("vidMood"), realism: value("vidRealism"), reference: value("vidReference") }, visual: { lighting: value("vidLighting"), grading: value("vidColorGrading"), effects: value("vidEffects") }, audio: { music: value("vidMusic"), sfx: value("vidSfx"), voiceover: value("vidVoiceover") }, out: { duration: numberValue("vidOutputDuration"), resolution: value("vidResolution"), fps: numberValue("vidFps"), ratio: value("vidAspectRatio") }, constraints: { negative: value("vidNegativePrompt"), avoid: lines("vidAvoid") } });
+    }
+    if (type === "ppt") {
+      const slideCount = numberValue("pptSlideCount");
+      const src = attachedFiles.pptSourceFile
+        ? `attached ${attachedFiles.pptSourceFile.label} file "${attachedFiles.pptSourceFile.name}"; use it as the only source`
+        : "";
+      return pruneEmpty({
+        task: "ppt",
+        role: value("pptRole"),
+        aud: value("pptAudience"),
+        obj: value("pptObjective"),
+        ctx: value("pptContext"),
+        inc: lines("pptMustInclude"),
+        avoid: lines("pptMustAvoid"),
+        deliv: choice("pptDeliverable"),
+        slides: slideCount > 0 ? slideCount : undefined,
+        per: pptPerSlide(),
+        notes: checked("pptSpeakerNotes"),
+        src,
+        guard: buildGuard("ppt", "", true),
+        steps: PPT_STEP_TEMPLATE,
+        reply: ["no preamble, restated task, or closing summary"]
+      });
     }
 
     return pruneEmpty({
@@ -1072,15 +1227,23 @@
     return output.join("\n");
   }
 
+  function pptPerSlideText(per) {
+    return per ? `up to ${per.max} ${per.unit}` : undefined;
+  }
+
+  function pptNotesText(data) {
+    return data.notes ? "include detailed speaker notes for each slide" : "no speaker notes";
+  }
+
   function renderPptMarkdown(data) {
     const output = ["# Presentation/Pitch Deck"];
     [["Role", data.role], ["Target Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx]].forEach(([label, item]) => addMarkdownValue(output, label, item));
     addMarkdownValue(output, "Must Include", data.inc);
     addMarkdownValue(output, "Must Avoid", data.avoid);
     addMarkdownValue(output, "Deliverable", data.deliv);
-    addMarkdownValue(output, "Slides", data.slides === "0" ? undefined : data.slides);
-    addMarkdownValue(output, "Per Slide", data.per);
-    addMarkdownValue(output, "Speaker Notes", data.notes === "true" ? "Yes" : undefined);
+    addMarkdownValue(output, "Slides", data.slides);
+    addMarkdownValue(output, "Per Slide", pptPerSlideText(data.per));
+    addMarkdownValue(output, "Speaker Notes", pptNotesText(data));
     addMarkdownValue(output, "Source", data.src);
     addMarkdownValue(output, "Guard", data.guard);
     addMarkdownValue(output, "Steps", data.steps);
@@ -1091,9 +1254,9 @@
   function renderPptPlain(data) {
     const output = ["Presentation/Pitch Deck"];
     [["Role", data.role], ["Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx], ["Include", data.inc], ["Avoid", data.avoid], ["Deliverable", data.deliv]].forEach(([label, item]) => addPlainValue(output, label, item));
-    if (data.slides !== "0") addPlainValue(output, "Slides", data.slides);
-    addPlainValue(output, "Per Slide", data.per);
-    if (data.notes === "true") addPlainValue(output, "Notes", "Yes");
+    addPlainValue(output, "Slides", data.slides);
+    addPlainValue(output, "Per Slide", pptPerSlideText(data.per));
+    addPlainValue(output, "Notes", pptNotesText(data));
     addPlainValue(output, "Source", data.src);
     [["Rules", data.guard], ["Steps", data.steps], ["Reply", data.reply]].forEach(([label, item]) => addPlainValue(output, label, item));
     return output.join("\n");
@@ -1326,6 +1489,10 @@
 
   // Word caps convert at roughly 4 tokens per 3 words.
   function replyBudget(data) {
+    if (data.task === "ppt") {
+      if (!data.slides || !data.per || data.per.unit !== "words") return "n/a";
+      return String(Math.ceil((data.slides * data.per.max * 4) / 3));
+    }
     if (data.task !== "text") return "n/a";
     const words = numberValue("replyLength");
     return words ? String(Math.ceil((words * 4) / 3)) : "No limit";
@@ -1409,6 +1576,10 @@
     applyTextCategoryPlaceholders();
     applyCodingCategoryGuidance();
     updateModeVisibility();
+    Object.keys(attachedFiles).forEach(key => { attachedFiles[key] = null; });
+    renderFileChip("pptSourceFile-chip", "pptSourceFile", "pptSourceFile");
+    updatePptWordsVisibility();
+    updatePptSlideCountTip();
     switchTab("text");
   }
 
@@ -1442,7 +1613,7 @@
   }
 
   function cacheElements() {
-    ["promptType", "category", "antiHallucinationGuard", "stepLocking", "guardState", "stepLockState", "evidenceGuard", "evidenceGuardState", "outputPlain", "outputMarkdown", "outputJson", "status", "generatedPayloadSection", "output", "outputDescription", "genericTokens", "selectedProviderTokens", "providerAdapterOverhead", "providerRatio", "providerIncrease", "replyBudget", "copyChatGptBtn", "copyClaudeBtn", "copyGeminiBtn", "copyGrokBtn", "copyGenericBtn", "clearBtn", "copyToast", "codingFieldsMount"].forEach(id => {
+    ["promptType", "category", "antiHallucinationGuard", "stepLocking", "guardState", "stepLockState", "evidenceGuard", "evidenceGuardState", "outputPlain", "outputMarkdown", "outputJson", "status", "generatedPayloadSection", "output", "outputDescription", "genericTokens", "selectedProviderTokens", "providerAdapterOverhead", "providerRatio", "providerIncrease", "replyBudget", "copyChatGptBtn", "copyClaudeBtn", "copyGeminiBtn", "copyGrokBtn", "copyCopilotBtn", "copyGenericBtn", "clearBtn", "copyToast", "codingFieldsMount", "pptFieldsMount"].forEach(id => {
       elements[id] = document.getElementById(id);
     });
   }
@@ -1493,16 +1664,17 @@
     elements.copyClaudeBtn.addEventListener("click", () => copyForProvider("claude"));
     elements.copyGeminiBtn.addEventListener("click", () => copyForProvider("gemini"));
     elements.copyGrokBtn.addEventListener("click", () => copyForProvider("grok"));
+    elements.copyCopilotBtn.addEventListener("click", () => copyForProvider("copilot"));
     elements.copyGenericBtn.addEventListener("click", () => copyForProvider("generic"));
     elements.clearBtn.addEventListener("click", clearAll);
     document.getElementById("prompt-form").addEventListener("input", event => {
-      if (event.target.matches("input, textarea, select")) {
+      if (event.target.matches("input, textarea, select") && event.target.type !== "file") {
         setError(event.target, "");
         scheduleOutputRefresh();
       }
     });
     document.getElementById("prompt-form").addEventListener("change", event => {
-      if (event.target.matches("input, textarea, select")) {
+      if (event.target.matches("input, textarea, select") && event.target.type !== "file") {
         setError(event.target, "");
         scheduleOutputRefresh();
       }
@@ -1512,6 +1684,7 @@
   function initialize() {
     cacheElements();
     renderCodingFields();
+    renderPptFields();
     cacheElements();
     initializeExistingLimits();
     addStaticFieldAssistance();
