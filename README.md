@@ -104,7 +104,7 @@ The form sets `autocomplete="off"`, so browsers neither suggest earlier entries 
 
 PPT/Pitch Deck's source file, Image Prompts' reference image, and Video Prompts' start frame are never read, uploaded, or stored. Only the sanitized file name enters the prompt; the browser's file selection is cleared immediately after the name is captured. Attach the actual file directly in your AI chat.
 
-That boundary ends at the clipboard. Once a prompt is pasted into a provider, it is governed by that provider's terms, retention, and training policies.
+That boundary ends at the clipboard. A copied prompt can carry sensitive context, so the clipboard is overwritten with an empty value 45 seconds after any Copy button is used, and each new copy restarts the timer. This only runs while the tab stays open and focused; it cannot reach content already pasted elsewhere. Once a prompt is pasted into a provider, it is governed by that provider's terms, retention, and training policies.
 
 ## Security
 
@@ -124,7 +124,7 @@ File names picked in PPT/Pitch Deck, Image Prompts, and Video Prompts are saniti
 **Residual risks, not fixed by this app:**
 
 - `frame-ancestors` cannot be set through a meta CSP tag, only through an HTTP response header, so this static site has no clickjacking protection from a hosting layer that does not add one.
-- Anything copied to the clipboard is readable by any other application running on the same device until it is overwritten.
+- Anything copied to the clipboard is readable by any other application running on the same device for up to 45 seconds, or indefinitely if the tab is closed or loses focus before the auto-clear runs.
 - Once a prompt is pasted into a provider, that provider's own privacy, retention, and training policies apply; this app has no influence past the clipboard.
 
 ## Hosting

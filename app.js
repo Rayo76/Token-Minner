@@ -515,6 +515,11 @@
   let hasGeneratedOutput = false;
   let refreshTimer;
   let selectedProvider = "chatgpt";
+  let clipboardClearTimer;
+
+  // Copied prompts can carry sensitive context, so the clipboard is wiped a short
+  // while after every copy rather than left holding it indefinitely.
+  const CLIPBOARD_CLEAR_MS = 45000;
 
   function createField(config) {
     const label = document.createElement("label");
@@ -1567,11 +1572,25 @@
     return copied;
   }
 
+  function scheduleClipboardClear() {
+    window.clearTimeout(clipboardClearTimer);
+    clipboardClearTimer = window.setTimeout(async () => {
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText("");
+        else clipboardFallback("");
+        showToast("Clipboard cleared for privacy");
+      } catch (error) {
+        // The tab may have lost focus or clipboard permission since the copy; nothing more to do.
+      }
+    }, CLIPBOARD_CLEAR_MS);
+  }
+
   async function copyText(text) {
     try {
       if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
       else if (!clipboardFallback(text)) throw new Error("Clipboard fallback failed");
-      showToast("Copied to clipboard");
+      showToast("Copied to clipboard. Cleared automatically in 45s.");
+      scheduleClipboardClear();
     } catch (error) {
       showToast("Copy failed. Select and copy the generated payload manually.", true);
     }
