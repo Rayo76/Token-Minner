@@ -28,8 +28,7 @@
     "Travel",
     "Health",
     "Financial Planning",
-    "Product Comparison",
-    "Presentation/Pitch Deck"
+    "Product Comparison"
   ]);
 
   function buildGuard(task, category, enabled) {
@@ -162,26 +161,39 @@
 
   const field = (id, label, tip, options = {}) => ({ id, label, tip, ...options });
 
-  // File sanitization: remove control chars, bidi controls, zero-width chars, collapse whitespace, cap length
+  // Strips dangerous characters only; does not truncate. The name is never used as a
+  // path, so ".." is left alone (e.g. "Q3..final.pdf" is a legitimate name); "/" and "\\"
+  // are replaced rather than rejected, since they cannot form a path from a bare filename.
   function sanitizeFilename(name) {
     if (typeof name !== "string") return "";
     let s = name.replace(/[\u0000-\u001F\u007F\u202A-\u202E\u2066-\u2069\u200B-\u200D\uFEFF]/g, "");
+    s = s.replace(/[/\\]/g, "_");
     s = s.replace(/\s+/g, " ").trim();
     s = s.replace(/"/g, "'");
-    s = s.substring(0, 200);
     return s;
   }
 
-  // Extract the extension from the LAST segment of the sanitised name and check it
-  // case-insensitively against an {ext: label} map. The accept attribute is only a hint;
-  // this is the actual gate. Rejects extensionless names and anything not on the list.
+  // Truncates to maxLength while preserving the extension, so a long but valid name
+  // loses length from its base rather than losing its extension entirely.
+  function truncateKeepingExtension(sanitized, ext, maxLength) {
+    if (sanitized.length <= maxLength) return sanitized;
+    const base = sanitized.slice(0, sanitized.length - ext.length);
+    return base.slice(0, Math.max(0, maxLength - ext.length)) + ext;
+  }
+
+  // Extract the extension from the LAST segment of the sanitised (untruncated) name and
+  // check it case-insensitively against an {ext: label} map. The accept attribute is only
+  // a hint; this is the actual gate. Rejects extensionless names and anything not on the
+  // list. Truncation happens only after a valid extension is confirmed, so a long name
+  // never loses the extension it was validated against.
   function getFileType(filename, extensionLabels) {
     const sanitized = sanitizeFilename(filename);
     if (!sanitized) return null;
     const parts = sanitized.split(".");
     if (parts.length < 2) return null;
     const ext = "." + parts[parts.length - 1].toLowerCase();
-    return Object.prototype.hasOwnProperty.call(extensionLabels, ext) ? { name: sanitized, ext, label: extensionLabels[ext] } : null;
+    if (!Object.prototype.hasOwnProperty.call(extensionLabels, ext)) return null;
+    return { name: truncateKeepingExtension(sanitized, ext, 200), ext, label: extensionLabels[ext] };
   }
 
   const PPT_SOURCE_EXTENSIONS = { ".docx": "Word", ".doc": "Word", ".xlsx": "Excel", ".xls": "Excel", ".pdf": "PDF", ".md": "Markdown" };
