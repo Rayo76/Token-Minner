@@ -12,8 +12,16 @@
     "Diet & Workout Plan": { role: "Qualified nutrition and fitness coach", targetAudience: "Fitness enthusiasts", objective: "Create a 12-week diet and workout plan", context: "Goals, restrictions, equipment, and schedule", mustInclude: "Meal structure\nWorkout progression", mustAvoid: "Extreme diets" },
     "Education & Learning": { role: "Curriculum designer", targetAudience: "Students", objective: "Create a structured learning path", context: "Current level, goal, available time, and resources", mustInclude: "Weekly schedule\nPractice tasks", mustAvoid: "Unmanageable workload" },
     "Debugging Issues": { role: "Senior debugging specialist", targetAudience: "Developers", objective: "Create a systematic diagnosis and fix plan", context: "Tech stack, symptoms, logs, and reproduction steps", mustInclude: "Evidence-based steps\nValidation", mustAvoid: "Unverified guesses" },
-    "Presentation/Pitch Deck": { role: "Senior presentation strategist and slide designer", targetAudience: "Investors or executive decision-makers", objective: "Create a persuasive 10-slide deck", context: "Subject, key message, time limit, and available data", mustInclude: "Slide-by-slide outline\nSpeaker notes", mustAvoid: "Invented statistics\nText-heavy slides" },
     "Other": { role: "", targetAudience: "", objective: "", context: "", mustInclude: "", mustAvoid: "" }
+  };
+
+  const PPT_PITCH_DECK_TEMPLATE = {
+    role: "Senior presentation strategist and slide designer",
+    targetAudience: "Investors or executive decision-makers",
+    objective: "Create a persuasive deck with strong story and clear ask",
+    context: "Subject, key message, time limit, and available data",
+    mustInclude: "Slide-by-slide outline\nClear funding or business ask",
+    mustAvoid: "Invented statistics\nText-heavy slides"
   };
 
   const CURRENT_DATA_CATEGORIES = new Set([
@@ -27,14 +35,14 @@
   function buildGuard(task, category, enabled) {
     if (!enabled) return undefined;
 
-    if (task === "text") {
+    if (task === "text" || task === "ppt") {
       const guard = [
         "use only supplied facts or actual tool results",
         "flag unknowns and assumptions inline",
         "never invent sources"
       ];
 
-      if (CURRENT_DATA_CATEGORIES.has(category)) {
+      if ((task === "text" && CURRENT_DATA_CATEGORIES.has(category)) || task === "ppt") {
         guard.push("mark unverified current data");
       }
 
@@ -63,9 +71,10 @@
     "Diet & Workout Plan": ["analyze goals and restrictions", "build diet and workout plan", "validate safety and feasibility"],
     "Education & Learning": ["analyze current level and learning goals", "build learning plan", "validate workload and progression"],
     "Debugging Issues": ["analyze evidence", "diagnose root cause", "validate fix plan"],
-    "Presentation/Pitch Deck": ["analyze audience, goal, and core message", "build storyline and one-idea-per-slide outline", "validate flow, timing, and supporting evidence"],
     "Other": ["analyze input", "build response", "validate result"]
   };
+
+  const PPT_STEP_TEMPLATE = ["analyze audience, goal, and core message", "build storyline and one-idea-per-slide outline", "validate flow, timing, and supporting evidence"];
 
   const GENERIC_WORKFLOW = [
     "Inspect current state",
@@ -152,6 +161,26 @@
   };
 
   const field = (id, label, tip, options = {}) => ({ id, label, tip, ...options });
+
+  // File sanitization: remove control chars, bidi controls, zero-width chars, collapse whitespace, cap length
+  function sanitizeFilename(name) {
+    if (typeof name !== "string") return "";
+    let s = name.replace(/[ -‪-‮⁦-⁩​-‍﻿]/g, "");
+    s = s.replace(/\s+/g, " ").trim();
+    s = s.replace(/"/g, "'");
+    s = s.substring(0, 200);
+    return s;
+  }
+
+  // Extract extension and validate against allowed list
+  function getFileType(filename, allowedExtensions) {
+    const sanitized = sanitizeFilename(filename);
+    if (!sanitized) return null;
+    const parts = sanitized.split(".");
+    if (parts.length < 2) return null;
+    const ext = "." + parts[parts.length - 1].toLowerCase();
+    return allowedExtensions.includes(ext) ? { name: sanitized, ext, type: allowedExtensions.indexOf(ext) } : null;
+  }
 
   const CODING_BASIC_GROUPS = [
     {
@@ -327,6 +356,91 @@
     }
   ];
 
+  const PPT_FIELDS = [
+    {
+      title: "Presentation Brief",
+      fields: [
+        field("pptRole", "Role", "describe the presenter's expertise and perspective.", {
+          defaultValue: PPT_PITCH_DECK_TEMPLATE.role
+        }),
+        field("pptAudience", "Target Audience", "name the decision-maker or attendee type.", {
+          defaultValue: PPT_PITCH_DECK_TEMPLATE.targetAudience
+        }),
+        field("pptObjective", "Objective", "state the exact outcome: build consensus, secure funding, or close a deal.", {
+          type: "textarea",
+          defaultValue: PPT_PITCH_DECK_TEMPLATE.objective
+        }),
+        field("pptContext", "Context", "provide the subject, key message, time limit, and available data.", {
+          type: "textarea",
+          defaultValue: PPT_PITCH_DECK_TEMPLATE.context
+        }),
+        field("pptMustInclude", "Must Include", "list required elements, one per line.", {
+          type: "textarea",
+          list: true,
+          defaultValue: PPT_PITCH_DECK_TEMPLATE.mustInclude
+        }),
+        field("pptMustAvoid", "Must Avoid", "list prohibited content or approaches, one per line.", {
+          type: "textarea",
+          list: true,
+          defaultValue: PPT_PITCH_DECK_TEMPLATE.mustAvoid
+        })
+      ]
+    },
+    {
+      title: "Deliverable and Scope",
+      fields: [
+        field("pptDeliverable", "Deliverable", "choose the output format.", {
+          type: "select",
+          defaultValue: "slide_outline",
+          choices: [
+            ["slide_outline", "Slide-by-slide outline (text)"],
+            ["pptx_file", "Downloadable .pptx file"],
+            ["deck_tool_content", "Content for a deck tool (Gamma, Canva, Copilot)"]
+          ]
+        }),
+        field("pptSlideCount", "Number of Slides", "choose a slide count or Unlimited (unbounded reply).", {
+          type: "select",
+          defaultValue: "5",
+          choices: [
+            ["5", "5 slides"], ["6", "6 slides"], ["7", "7 slides"], ["8", "8 slides"],
+            ["9", "9 slides"], ["10", "10 slides"], ["11", "11 slides"], ["12", "12 slides"],
+            ["0", "Unlimited ⚠"]
+          ]
+        }),
+        field("pptWordsPerSlide", "Words per Slide or Bullets", "choose a word limit or bullet count.", {
+          type: "select",
+          defaultValue: "40_words",
+          choices: [
+            ["20_words", "Up to 20 words"], ["25_words", "Up to 25 words"], ["40_words", "Up to 40 words"],
+            ["50_words", "Up to 50 words"], ["60_words", "Up to 60 words"], ["75_words", "Up to 75 words"],
+            ["3_bullets", "Up to 3 bullets"], ["4_bullets", "Up to 4 bullets"], ["5_bullets", "Up to 5 bullets"],
+            ["custom_words", "Custom word count"]
+          ]
+        }),
+        field("pptCustomWords", "Custom Word Count", "enter a word limit from 10 to 150 (visible only when Custom is selected).", {
+          type: "number",
+          min: 10,
+          max: 150,
+          step: 1,
+          hidden: true
+        }),
+        field("pptSpeakerNotes", "Speaker Notes", "include detailed speaker notes alongside slides.", {
+          type: "checkbox"
+        })
+      ]
+    },
+    {
+      title: "Source Material",
+      fields: [
+        field("pptSourceFile", "Select source file", "Word, Excel, PDF or Markdown. Only the file name is used.", {
+          type: "file",
+          fileInput: true,
+          accept: ".docx,.doc,.xlsx,.xls,.pdf,.md"
+        })
+      ]
+    }
+  ];
+
   const elements = {};
   let toastTimer;
   let workflowManaged = true;
@@ -337,10 +451,18 @@
   function createField(config) {
     const label = document.createElement("label");
     if (config.full) label.classList.add("full");
+    if (config.hidden) label.hidden = true;
     label.appendChild(document.createTextNode(config.label));
 
     let control;
-    if (config.type === "textarea") {
+    if (config.type === "checkbox") {
+      control = document.createElement("input");
+      control.type = "checkbox";
+    } else if (config.type === "file") {
+      control = document.createElement("input");
+      control.type = "file";
+      if (config.accept) control.accept = config.accept;
+    } else if (config.type === "textarea") {
       control = document.createElement("textarea");
       control.rows = 3;
       control.maxLength = 5000;
@@ -949,9 +1071,36 @@
     return output.join("\n");
   }
 
+  function renderPptMarkdown(data) {
+    const output = ["# Presentation/Pitch Deck"];
+    [["Role", data.role], ["Target Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx]].forEach(([label, item]) => addMarkdownValue(output, label, item));
+    addMarkdownValue(output, "Must Include", data.inc);
+    addMarkdownValue(output, "Must Avoid", data.avoid);
+    addMarkdownValue(output, "Deliverable", data.deliv);
+    addMarkdownValue(output, "Slides", data.slides === "0" ? undefined : data.slides);
+    addMarkdownValue(output, "Per Slide", data.per);
+    addMarkdownValue(output, "Speaker Notes", data.notes === "true" ? "Yes" : undefined);
+    addMarkdownValue(output, "Source", data.src);
+    addMarkdownValue(output, "Guard", data.guard);
+    addMarkdownValue(output, "Steps", data.steps);
+    addMarkdownValue(output, "Reply", data.reply);
+    return output.join("\n");
+  }
+
+  function renderPptPlain(data) {
+    const output = ["Presentation/Pitch Deck"];
+    [["Role", data.role], ["Audience", data.aud], ["Objective", data.obj], ["Context", data.ctx], ["Include", data.inc], ["Avoid", data.avoid], ["Deliverable", data.deliv]].forEach(([label, item]) => addPlainValue(output, label, item));
+    if (data.slides !== "0") addPlainValue(output, "Slides", data.slides);
+    addPlainValue(output, "Per Slide", data.per);
+    if (data.notes === "true") addPlainValue(output, "Notes", "Yes");
+    addPlainValue(output, "Source", data.src);
+    [["Rules", data.guard], ["Steps", data.steps], ["Reply", data.reply]].forEach(([label, item]) => addPlainValue(output, label, item));
+    return output.join("\n");
+  }
+
   const RENDERERS = {
-    plain: { text: renderTextPlain, image: renderImagePlain, video: renderVideoPlain, coding_loop: renderCodingLoopPlain },
-    markdown: { text: renderTextMarkdown, image: renderImageMarkdown, video: renderVideoMarkdown, coding_loop: renderCodingLoopMarkdown }
+    plain: { text: renderTextPlain, image: renderImagePlain, video: renderVideoPlain, coding_loop: renderCodingLoopPlain, ppt: renderPptPlain },
+    markdown: { text: renderTextMarkdown, image: renderImageMarkdown, video: renderVideoMarkdown, coding_loop: renderCodingLoopMarkdown, ppt: renderPptMarkdown }
   };
 
   function minifiedJson(data) {
@@ -981,6 +1130,13 @@
       claude: "Give one best answer rather than several alternatives unless asked.",
       gemini: "No key-takeaways section or suggested next steps.",
       grok: "Plain tone; no jokes or asides."
+    },
+    ppt: {
+      chatgpt: "No follow-up offers or questions unless required input is missing.",
+      claude: "Give one best answer rather than several alternatives unless asked.",
+      gemini: "No key-takeaways section or suggested next steps.",
+      grok: "Plain tone; no jokes or asides.",
+      copilot: "Generate the presentation outline now without embellishment."
     },
     image: { chatgpt: IMAGE_NOTE, gemini: IMAGE_NOTE, grok: IMAGE_NOTE },
     video: { gemini: VIDEO_NOTE, grok: VIDEO_NOTE },
@@ -1076,6 +1232,14 @@
   }
 
   function validateControl(control) {
+    if (control.type === "file") return "";
+    if (control.type === "checkbox") return "";
+    if (control.id === "pptCustomWords" && value("pptWordsPerSlide") !== "custom_words") return "";
+    if (control.id === "pptCustomWords" && value("pptWordsPerSlide") === "custom_words") {
+      const n = Number(control.value);
+      if (!Number.isInteger(n) || n < 10 || n > 150) return "Enter a whole number from 10 to 150.";
+      return "";
+    }
     const text = control.value.trim();
     if (!text) {
       if (control.dataset.requiredPositive === "true") return "Enter a duration greater than 0.";
