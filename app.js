@@ -165,7 +165,7 @@
   // File sanitization: remove control chars, bidi controls, zero-width chars, collapse whitespace, cap length
   function sanitizeFilename(name) {
     if (typeof name !== "string") return "";
-    let s = name.replace(/[ -‪-‮⁦-⁩​-‍﻿]/g, "");
+    let s = name.replace(/[\u0000-\u001F\u007F\u202A-\u202E\u2066-\u2069\u200B-\u200D\uFEFF]/g, "");
     s = s.replace(/\s+/g, " ").trim();
     s = s.replace(/"/g, "'");
     s = s.substring(0, 200);
@@ -638,7 +638,8 @@
       text: { chatgpt: "Copy for ChatGPT", claude: "Copy for Claude", gemini: "Copy for Gemini", grok: "Copy for Grok", generic: "Copy Generic" },
       image: { chatgpt: "Copy for ChatGPT Images", gemini: "Copy for Gemini Image", grok: "Copy for Grok Image", generic: "Copy Generic Image" },
       video: { gemini: "Copy for Gemini Video", grok: "Copy for Grok Video", generic: "Copy Generic Video" },
-      coding: { chatgpt: "Copy for Codex", claude: "Copy for Claude Code", gemini: "Copy for Google Antigravity", grok: "Copy for Grok Build", generic: "Copy Generic Loop" }
+      coding: { chatgpt: "Copy for Codex", claude: "Copy for Claude Code", gemini: "Copy for Google Antigravity", grok: "Copy for Grok Build", generic: "Copy Generic Loop" },
+      ppt: { chatgpt: "Copy for ChatGPT", claude: "Copy for Claude", gemini: "Copy for Gemini", grok: "Copy for Grok", copilot: "Copy for Microsoft Copilot", generic: "Copy Generic" }
     };
     const buttons = { chatgpt: elements.copyChatGptBtn, claude: elements.copyClaudeBtn, gemini: elements.copyGeminiBtn, grok: elements.copyGrokBtn, generic: elements.copyGenericBtn };
     Object.entries(buttons).forEach(([provider, button]) => {
@@ -1447,11 +1448,12 @@
   }
 
   function bindEvents() {
-    const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
-    tabButtons.forEach(button => button.addEventListener("click", () => activateTab(button.dataset.promptType)));
+    const allTabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+    allTabButtons.forEach(button => button.addEventListener("click", () => activateTab(button.dataset.promptType)));
     document.querySelector(".prompt-tabs").addEventListener("keydown", event => {
       const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
       if (!step) return;
+      const tabButtons = allTabButtons.filter(button => !button.hidden);
       const current = tabButtons.indexOf(document.activeElement);
       if (current === -1) return;
       event.preventDefault();
