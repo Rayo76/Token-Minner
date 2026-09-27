@@ -39,7 +39,9 @@ The reply is usually longer than the prompt, so every text prompt also shapes th
 - Every text prompt asks for no preamble, restated task, or closing summary.
 - With Step Locking on, the steps are listed and the model is asked not to narrate them.
 - The Anti-Hallucination Guard asks for unknowns and assumptions to be flagged inline rather than in separate sections.
+- The Coding Loop Evidence Guard is on by default. It requires claims about edits, commands, tests, approvals, and results to be backed by observable evidence; it can be turned off independently of the Text guard.
 - Coding Loop per-iteration reports default to 5 lines with commands but no logs, and a required final diff review asks the agent to review the diff without printing it.
+- PPT/Pitch Deck always includes the supplied-facts guard, which marks unverified current data and prohibits invented sources.
 
 These changes are expected to shorten replies; the app cannot measure reply length itself.
 
@@ -94,7 +96,7 @@ Character limits (500 for single-line fields, 5000 for textareas), a 50-entry ca
 - The form regenerates the output 225 ms after valid structured edits, but only after the first manual generation.
 - Changing task type or mode hides the previous payload when the new form is invalid, so one task type's prompt is never left on screen under another. It reappears once the new form validates.
 - Copy buttons do nothing until a generate has succeeded and the output section is visible.
-- Clear restores Text Prompts, default modes, Plain Text, Standard reply length, Coding Loop defaults, collapsed advanced sections, attached file names, and an empty output area.
+- Clear restores Text Prompts, default modes, Plain Text, Standard reply length, Coding Loop defaults, and collapsed advanced sections; it clears attached file names and the generated output area.
 
 ## Privacy
 
